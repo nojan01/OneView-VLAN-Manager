@@ -1,0 +1,20 @@
+{
+    "OneViewAppliances": [
+        {
+            "Name": "OneView-Prod-01",
+            "Hostname": "oneview01.domain.local",
+            "Description": "Produktiv OneView Appliance 1"
+        }
+    ],
+    "ApiVersion": 8000,
+    "ExcelFilePath": ".\\VLANs.xlsx",
+    "ExcelSheetName": "VLANs",
+    "DefaultSettings": {
+        "Purpose": "General",
+        "SmartLink": true,
+        "PrivateNetwork": false,
+        "EthernetNetworkType": "Tagged",
+        "PreferredBandwidthGb": 2.5,
+        "MaximumBandwidthGb": 50
+    }
+}

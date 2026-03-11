@@ -1,0 +1,6 @@
+# OneView Appliances – eine Appliance pro Zeile
+# Zeilen mit # werden ignoriert
+#
+# Format: Hostname oder IP-Adresse
+oneview01.domain.local
+# oneview02.domain.local
