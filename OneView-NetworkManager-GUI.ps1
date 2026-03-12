@@ -55,9 +55,17 @@ function Get-AppliancesFromFile {
         return @()
     }
 
-    $appliances = Get-Content -Path $FilePath |
+    $appliances = @()
+    Get-Content -Path $FilePath |
         ForEach-Object { $_.Trim() } |
-        Where-Object { $_ -and -not $_.StartsWith('#') }
+        Where-Object { $_ -and -not $_.StartsWith('#') } |
+        ForEach-Object {
+            $parts = $_ -split '\s*;\s*', 2
+            $appliances += [PSCustomObject]@{
+                Hostname = $parts[0].Trim()
+                Type     = if ($parts.Count -gt 1) { $parts[1].Trim() } else { "" }
+            }
+        }
 
     return $appliances
 }
@@ -285,7 +293,7 @@ function Show-ApplianceSelectionDialog {
     .SYNOPSIS  Zeigt einen Dialog mit Checkbox-Liste zur Auswahl von Appliances.
     #>
     param(
-        [string[]]$Appliances,
+        [object[]]$Appliances,
         [string]$Title = "Appliances auswählen"
     )
 
@@ -309,7 +317,8 @@ function Show-ApplianceSelectionDialog {
     $clb.Size = New-Object System.Drawing.Size(505, 290)
     $clb.CheckOnClick = $true
     foreach ($a in $Appliances) {
-        $clb.Items.Add($a, $false) | Out-Null
+        $displayName = if ($a.Type) { "$($a.Hostname) ($($a.Type))" } else { $a.Hostname }
+        $clb.Items.Add($displayName, $false) | Out-Null
     }
     $dlg.Controls.Add($clb)
 
@@ -353,7 +362,7 @@ function Show-ApplianceSelectionDialog {
     $selected = @()
     for ($i = 0; $i -lt $clb.Items.Count; $i++) {
         if ($clb.GetItemChecked($i)) {
-            $selected += $clb.Items[$i]
+            $selected += $Appliances[$i].Hostname
         }
     }
     $dlg.Dispose()
@@ -365,7 +374,7 @@ function Show-SingleApplianceSelectionDialog {
     .SYNOPSIS  Zeigt einen Dialog zur Auswahl genau einer Appliance.
     #>
     param(
-        [string[]]$Appliances,
+        [object[]]$Appliances,
         [string]$Title = "Appliance auswählen"
     )
 
@@ -389,7 +398,8 @@ function Show-SingleApplianceSelectionDialog {
     $lb.Size = New-Object System.Drawing.Size(505, 290)
     $lb.SelectionMode = [System.Windows.Forms.SelectionMode]::One
     foreach ($a in $Appliances) {
-        $lb.Items.Add($a) | Out-Null
+        $displayName = if ($a.Type) { "$($a.Hostname) ($($a.Type))" } else { $a.Hostname }
+        $lb.Items.Add($displayName) | Out-Null
     }
     if ($lb.Items.Count -gt 0) { $lb.SelectedIndex = 0 }
     $dlg.Controls.Add($lb)
@@ -414,7 +424,7 @@ function Show-SingleApplianceSelectionDialog {
     if ($result -ne [System.Windows.Forms.DialogResult]::OK) { return $null }
     if ($null -eq $lb.SelectedItem) { return $null }
 
-    $selected = $lb.SelectedItem.ToString()
+    $selected = $Appliances[$lb.SelectedIndex].Hostname
     $dlg.Dispose()
     return $selected
 }
