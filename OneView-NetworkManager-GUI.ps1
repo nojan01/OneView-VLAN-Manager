@@ -185,7 +185,7 @@ $tblActions.Controls.Add($btnNSImport, 0, 1)
 
 # Button: Network Set Backup (Multi-Appliance)
 $btnNSBackup = New-Object System.Windows.Forms.Button
-$btnNSBackup.Text = "NS Backup (Multi)"
+$btnNSBackup.Text = "Network Set Backup (Multi)"
 $btnNSBackup.Dock = [System.Windows.Forms.DockStyle]::Fill
 $btnNSBackup.Margin = New-Object System.Windows.Forms.Padding(3, 3, 3, 0)
 $btnNSBackup.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 80)
@@ -1358,7 +1358,7 @@ $btnNSImport.Add_Click({
         return
     }
 
-    $hostname = Show-SingleApplianceSelectionDialog -Appliances $appliances -Title "NS Import – Appliance auswählen"
+    $hostname = Show-SingleApplianceSelectionDialog -Appliances $appliances -Title "Network Set Import – Appliance auswählen"
     if (-not $hostname) { return }
 
     # Excel-Datei auswählen
@@ -1371,7 +1371,7 @@ $btnNSImport.Add_Click({
 
     $confirm = [System.Windows.Forms.MessageBox]::Show(
         "Network Sets aus der Excel-Datei auf`n$hostname`nerstellen/aktualisieren?`n`nDatei: $excelPath",
-        "NS Import bestätigen",
+        "Network Set Import bestätigen",
         [System.Windows.Forms.MessageBoxButtons]::YesNo,
         [System.Windows.Forms.MessageBoxIcon]::Question
     )
@@ -1437,13 +1437,13 @@ $btnNSBackup.Add_Click({
         return
     }
 
-    $selectedAppliances = Show-ApplianceSelectionDialog -Appliances $appliances -Title "NS Backup – Appliances auswählen"
+    $selectedAppliances = Show-ApplianceSelectionDialog -Appliances $appliances -Title "Network Set Backup – Appliances auswählen"
     if (-not $selectedAppliances -or $selectedAppliances.Count -eq 0) { return }
 
     $applianceList = $selectedAppliances -join "`n"
     $confirm = [System.Windows.Forms.MessageBox]::Show(
         "Network Set Backup von $($selectedAppliances.Count) Appliance(s) erstellen?`n`n$applianceList",
-        "NS Backup bestätigen",
+        "Network Set Backup bestätigen",
         [System.Windows.Forms.MessageBoxButtons]::YesNo,
         [System.Windows.Forms.MessageBoxIcon]::Question
     )
@@ -1470,7 +1470,7 @@ $btnNSBackup.Add_Click({
         $errorCount = 0
 
         foreach ($applianceHost in $selectedAppliances) {
-            Write-GUILog "Starte NS Backup von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
+            Write-GUILog "Starte Network Set Backup von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
 
             $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
             $exportPath = Join-Path $backupDir ("NetworkSets_${safeName}.xlsx")
@@ -1490,10 +1490,10 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
                 $exitCode = Invoke-SubprocessWithLiveOutput -Command $psCommand
 
                 if ($exitCode -eq 0 -and (Test-Path $exportPath)) {
-                    Write-GUILog "NS Backup erfolgreich: $applianceHost" -Color ([System.Drawing.Color]::FromArgb(80, 220, 80))
+                    Write-GUILog "Network Set Backup erfolgreich: $applianceHost" -Color ([System.Drawing.Color]::FromArgb(80, 220, 80))
                     $successCount++
                 } else {
-                    Write-GUILog "NS Backup fehlgeschlagen: $applianceHost" -Color ([System.Drawing.Color]::FromArgb(255, 80, 80))
+                    Write-GUILog "Network Set Backup fehlgeschlagen: $applianceHost" -Color ([System.Drawing.Color]::FromArgb(255, 80, 80))
                     $errorCount++
                 }
             }
@@ -1509,12 +1509,12 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
         }
 
         Write-GUILog "" -Color ([System.Drawing.Color]::Cyan)
-        Write-GUILog "NS Backup abgeschlossen: $successCount erfolgreich, $errorCount fehlgeschlagen" -Color ([System.Drawing.Color]::Cyan)
+        Write-GUILog "Network Set Backup abgeschlossen: $successCount erfolgreich, $errorCount fehlgeschlagen" -Color ([System.Drawing.Color]::Cyan)
         Write-GUILog "Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
 
         [System.Windows.Forms.MessageBox]::Show(
             "Network Set Backup abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupDir",
-            "NS Backup Ergebnis",
+            "Network Set Backup Ergebnis",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Information
         ) | Out-Null
