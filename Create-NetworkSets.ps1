@@ -1,30 +1,28 @@
 <#
 .SYNOPSIS
-    Erstellt Ethernet Networks in HPE OneView basierend auf einer Excel-Datei.
+    Erstellt und aktualisiert Network Sets in HPE OneView basierend auf einer Excel-Datei.
 
 .DESCRIPTION
-    Dieses Skript liest VLAN-Definitionen aus einer Excel-Datei und erstellt
-    die entsprechenden Ethernet Networks über die HPE OneView RESTful API.
+    Dieses Skript liest Network-Set-Definitionen aus einer Excel-Datei und erstellt
+    bzw. aktualisiert die entsprechenden Network Sets über die HPE OneView RESTful API.
 
-    Unterstützte Felder (gemäss OneView "Create Network" Dialog):
-    - Name, VLAN ID, EthernetNetworkType (Tagged/Untagged/Tunnel)
-    - Purpose (General, Management, VMMigration, FaultTolerance, ISCSI)
-    - SmartLink, PrivateNetwork
+    Unterstützte Felder:
+    - NetworkSetName (Pflicht)
+    - Networks (Pflicht – Semikolon-getrennte Liste von Ethernet Network Namen)
+    - NativeNetwork (optional – muss eines der Networks sein)
     - Preferred / Maximum Bandwidth (in Gb/s, wie in der GUI)
     - Scope (Zuweisung zu vorhandenem Scope)
-    - Network Set (Zuweisung zu vorhandenem Network Set)
-    - IPv4 / IPv6 Subnet ID (Assoziation mit vorhandenem Subnet)
+    - Description
 
     Ablauf:
     1. Konfiguration aus config.json laden
-    2. VLAN-Daten aus Excel importieren & validieren
+    2. Network-Set-Daten aus Excel importieren & validieren
     3. Authentifizierung an der OneView Appliance (REST API)
-    4. Existierende Netzwerke, Network Sets und Scopes abrufen
-    5. Ethernet Networks erstellen (POST /rest/ethernet-networks)
+    4. Existierende Network Sets, Ethernet Networks und Scopes abrufen
+    5. Network Sets erstellen (POST /rest/network-sets) oder aktualisieren (PUT)
     6. Bandwidth setzen (PUT /rest/connection-templates/{id})
-    7. Network Set aktualisieren (PUT /rest/network-sets/{id})
-    8. Scope zuweisen (PATCH /rest/scopes/{id})
-    9. Session abmelden & Protokoll speichern
+    7. Scope zuweisen (PATCH /rest/scopes/{id})
+    8. Session abmelden & Protokoll speichern
 
 .PARAMETER ConfigPath
     Pfad zur Konfigurationsdatei (Standard: .\config.json)
@@ -33,11 +31,11 @@
     Simuliert die Erstellung ohne tatsächliche Änderungen in OneView.
 
 .EXAMPLE
-    .\Create-EthernetNetworks.ps1
+    .\Create-NetworkSets.ps1
     Führt das Skript mit Standardkonfiguration aus.
 
 .EXAMPLE
-    .\Create-EthernetNetworks.ps1 -ConfigPath "C:\Config\myconfig.json" -WhatIf
+    .\Create-NetworkSets.ps1 -ConfigPath "C:\Config\myconfig.json" -WhatIf
     Simuliert die Erstellung mit benutzerdefinierter Konfiguration.
 
 .NOTES
@@ -50,7 +48,10 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter()]
-    [string]$ConfigPath = (Join-Path $PSScriptRoot "config.json")
+    [string]$ConfigPath = (Join-Path $PSScriptRoot "config.json"),
+
+    [Parameter()]
+    [string]$LogPath = ""
 )
 
 # ============================================================================
@@ -58,14 +59,11 @@ param(
 # ============================================================================
 $ErrorActionPreference = "Stop"
 $script:LogEntries = [System.Collections.Generic.List[string]]::new()
-$script:CreatedNetworks = 0
-$script:UpdatedNetworks = 0
-$script:SkippedNetworks = 0
-$script:FailedNetworks  = 0
-
-# Gültige Werte gemäss HPE OneView API
-$ValidPurposes             = @("General", "Management", "VMMigration", "FaultTolerance", "ISCSI")
-$ValidEthernetNetworkTypes = @("Tagged", "Untagged", "Tunnel")
+$script:LogPath = $LogPath
+$script:CreatedSets  = 0
+$script:UpdatedSets  = 0
+$script:SkippedSets  = 0
+$script:FailedSets   = 0
 
 # ============================================================================
 #  Hilfsfunktionen
@@ -91,10 +89,17 @@ function Write-Log {
 
 function Save-Log {
     param([string]$LogDir = $PSScriptRoot)
-    $logsDir = Join-Path $LogDir "Logs"
-    if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
-    $logFile = Join-Path $logsDir ("VLAN_Import_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
-    $script:LogEntries | Set-Content -Path $logFile -Encoding UTF8
+    if ($script:LogPath) {
+        $logFile = $script:LogPath
+        $parent = Split-Path $logFile -Parent
+        if (-not (Test-Path $parent)) { New-Item -Path $parent -ItemType Directory -Force | Out-Null }
+        $script:LogEntries | Add-Content -Path $logFile -Encoding UTF8
+    } else {
+        $logsDir = Join-Path $LogDir "Logs"
+        if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
+        $logFile = Join-Path $logsDir ("NetworkSet_Import_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
+        $script:LogEntries | Set-Content -Path $logFile -Encoding UTF8
+    }
     Write-Host "`nProtokoll gespeichert: $logFile" -ForegroundColor Cyan
 }
 
@@ -103,9 +108,6 @@ function Save-Log {
 # ============================================================================
 
 function Connect-OneViewAPI {
-    <#
-    .SYNOPSIS  Authentifizierung via POST /rest/login-sessions
-    #>
     param(
         [Parameter(Mandatory)][string]$Hostname,
         [Parameter(Mandatory)][PSCredential]$Credential,
@@ -159,9 +161,6 @@ function Connect-OneViewAPI {
 }
 
 function Disconnect-OneViewAPI {
-    <#
-    .SYNOPSIS  Abmeldung via DELETE /rest/login-sessions
-    #>
     param([Parameter(Mandatory)][hashtable]$Session)
 
     try {
@@ -177,13 +176,6 @@ function Disconnect-OneViewAPI {
 }
 
 function Get-OneViewApiVersion {
-    <#
-    .SYNOPSIS  Ermittelt die aktuelle API-Version einer OneView Appliance via GET /rest/version
-    .DESCRIPTION
-        Der Endpoint /rest/version erfordert KEINE Authentifizierung und liefert
-        die aktuelle (currentVersion) und minimale (minimumVersion) API-Version.
-        Gibt bei Fehler den übergebenen Fallback-Wert zurück.
-    #>
     param(
         [Parameter(Mandatory)][string]$Hostname,
         [int]$FallbackVersion = 8000
@@ -208,13 +200,6 @@ function Get-OneViewApiVersion {
 # ============================================================================
 
 function Get-AllPaginated {
-    <#
-    .SYNOPSIS
-        Ruft alle Ergebnisse einer paginierten OneView API-Ressource ab.
-    .DESCRIPTION
-        Die OneView API liefert standardmäßig max. 100 Einträge pro Seite.
-        Diese Funktion iteriert über alle Seiten und gibt sämtliche Members zurück.
-    #>
     param(
         [Parameter(Mandatory)][hashtable]$Session,
         [Parameter(Mandatory)][string]$ResourcePath,
@@ -243,16 +228,13 @@ function Get-AllPaginated {
 }
 
 function Get-ExistingEthernetNetworks {
-    <#
-    .SYNOPSIS  GET /rest/ethernet-networks – alle existierenden Ethernet Networks (paginiert)
-    #>
     param([Parameter(Mandatory)][hashtable]$Session)
 
     Write-Log "Rufe existierende Ethernet Networks ab (paginiert)..."
 
     try {
         $networks = Get-AllPaginated -Session $Session -ResourcePath "/rest/ethernet-networks"
-        Write-Log "  $($networks.Count) existierende Ethernet Networks gefunden." -Level INFO
+        Write-Log "  $($networks.Count) Ethernet Networks gefunden." -Level INFO
         return $networks
     }
     catch {
@@ -262,9 +244,6 @@ function Get-ExistingEthernetNetworks {
 }
 
 function Get-ExistingNetworkSets {
-    <#
-    .SYNOPSIS  GET /rest/network-sets – alle existierenden Network Sets (paginiert)
-    #>
     param([Parameter(Mandatory)][hashtable]$Session)
 
     Write-Log "Rufe existierende Network Sets ab (paginiert)..."
@@ -281,9 +260,6 @@ function Get-ExistingNetworkSets {
 }
 
 function Get-ExistingScopes {
-    <#
-    .SYNOPSIS  GET /rest/scopes – alle existierenden Scopes (paginiert)
-    #>
     param([Parameter(Mandatory)][hashtable]$Session)
 
     Write-Log "Rufe existierende Scopes ab (paginiert)..."
@@ -303,54 +279,36 @@ function Get-ExistingScopes {
 #  OneView REST API – CREATE / UPDATE Funktionen
 # ============================================================================
 
-function New-EthernetNetwork {
+function New-NetworkSet {
     <#
-    .SYNOPSIS  POST /rest/ethernet-networks – neues Ethernet Network erstellen
-    .DESCRIPTION
-        Verwendet Invoke-WebRequest (statt Invoke-RestMethod) um HTTP Status Code
-        und Location Header auswerten zu können.
-
-        Mögliche API-Antworten:
-        - 201 Created  + Body mit vollständigem Netzwerk-Objekt
-        - 201 Created  + Location Header (Body leer oder minimal)
-        - 202 Accepted + Task-Objekt im Body oder Location → Task-URI
-
-        Fallback: Netzwerk per Name-Filter suchen.
+    .SYNOPSIS  POST /rest/network-sets – neues Network Set erstellen
     #>
     param(
         [Parameter(Mandatory)][hashtable]$Session,
-        [Parameter(Mandatory)][hashtable]$NetworkDefinition
+        [Parameter(Mandatory)][hashtable]$SetDefinition
     )
 
-    $uri = "$($Session.BaseUri)/rest/ethernet-networks"
+    $uri = "$($Session.BaseUri)/rest/network-sets"
 
     $body = @{
-        type                = "ethernet-networkV4"
-        name                = $NetworkDefinition.Name
-        vlanId              = [int]$NetworkDefinition.VlanId
-        purpose             = $NetworkDefinition.Purpose
-        ethernetNetworkType = $NetworkDefinition.EthernetNetworkType
-        smartLink           = [bool]$NetworkDefinition.SmartLink
-        privateNetwork      = [bool]$NetworkDefinition.PrivateNetwork
+        type            = "network-setV5"
+        name            = $SetDefinition.Name
+        networkUris     = @($SetDefinition.NetworkUris)
     }
 
-    # Optionale Felder
-    if (-not [string]::IsNullOrWhiteSpace($NetworkDefinition.Description)) {
-        $body["description"] = $NetworkDefinition.Description
+    if (-not [string]::IsNullOrWhiteSpace($SetDefinition.NativeNetworkUri)) {
+        $body["nativeNetworkUri"] = $SetDefinition.NativeNetworkUri
     }
-    if (-not [string]::IsNullOrWhiteSpace($NetworkDefinition.IPv4SubnetId)) {
-        $body["subnetUri"] = $NetworkDefinition.IPv4SubnetId
-    }
-    if (-not [string]::IsNullOrWhiteSpace($NetworkDefinition.IPv6SubnetId)) {
-        $body["ipv6SubnetUri"] = $NetworkDefinition.IPv6SubnetId
+
+    if (-not [string]::IsNullOrWhiteSpace($SetDefinition.Description)) {
+        $body["description"] = $SetDefinition.Description
     }
 
     $jsonBody = $body | ConvertTo-Json -Depth 5
 
-    Write-Log "  Erstelle Ethernet Network: $($NetworkDefinition.Name) (VLAN $($NetworkDefinition.VlanId))..."
+    Write-Log "  Erstelle Network Set: $($SetDefinition.Name) ($($SetDefinition.NetworkUris.Count) Netzwerke)..."
 
     try {
-        # Invoke-WebRequest verwenden um HTTP Status Code und Header auszuwerten
         $webResponse = Invoke-WebRequest -Uri $uri `
             -Method Post `
             -Headers $Session.Headers `
@@ -359,18 +317,15 @@ function New-EthernetNetwork {
 
         $statusCode = $webResponse.StatusCode
 
-        # Response Body parsen (kann leer sein)
         $responseBody = $null
         if ($webResponse.Content -and $webResponse.Content.Trim().Length -gt 0) {
             $responseBody = $webResponse.Content | ConvertFrom-Json
         }
 
-        # Location Header auslesen
         $locationHeader = $null
         if ($webResponse.Headers.ContainsKey("Location")) {
             $locationValues = $webResponse.Headers["Location"]
             $locationHeader = if ($locationValues -is [array]) { $locationValues[0] } else { $locationValues }
-            # Absolute URI → relative URI extrahieren
             if ($locationHeader -match "^https?://") {
                 $locationHeader = ([System.Uri]$locationHeader).AbsolutePath
             }
@@ -381,72 +336,72 @@ function New-EthernetNetwork {
             $(if ($responseBody) { $responseBody.type } else { "(leer)" }), `
             $(if ($locationHeader) { $locationHeader } else { "(keine)" })) -Level INFO
 
-        # --- Fall 1: Synchrone Antwort mit vollständigem Netzwerk-Objekt im Body ---
-        if ($responseBody -and $responseBody.uri -and $responseBody.uri -like "/rest/ethernet-networks/*") {
+        # Fall 1: Synchrone Antwort mit vollständigem Objekt im Body
+        if ($responseBody -and $responseBody.uri -and $responseBody.uri -like "/rest/network-sets/*") {
             Write-Log "  Erfolgreich erstellt: $($responseBody.name) (URI: $($responseBody.uri))" -Level SUCCESS
             return $responseBody
         }
 
-        # --- Fall 2: Task-Objekt im Body (asynchrone Verarbeitung, HTTP 202) ---
+        # Fall 2: Task-Objekt im Body (asynchrone Verarbeitung)
         $taskUri = $null
         if ($responseBody) {
-            if ($responseBody.type -like "*Task*")       { $taskUri = $responseBody.uri }
-            elseif ($responseBody.uri -like "/rest/tasks/*") { $taskUri = $responseBody.uri }
-            elseif ($responseBody.taskUri)                { $taskUri = $responseBody.taskUri }
+            if ($responseBody.type -like "*Task*")           { $taskUri = $responseBody.uri }
+            elseif ($responseBody.uri -like "/rest/tasks/*")  { $taskUri = $responseBody.uri }
+            elseif ($responseBody.taskUri)                    { $taskUri = $responseBody.taskUri }
         }
         if ($taskUri) {
             Write-Log "  Task erkannt im Body ($taskUri) – warte auf Abschluss..." -Level INFO
-            $networkUri = Wait-OneViewTask -Session $Session -TaskUri $taskUri
-            $network = Invoke-RestMethod -Uri "$($Session.BaseUri)$networkUri" `
+            $nsUri = Wait-OneViewTask -Session $Session -TaskUri $taskUri
+            $ns = Invoke-RestMethod -Uri "$($Session.BaseUri)$nsUri" `
                 -Method Get -Headers $Session.Headers -SkipCertificateCheck
-            Write-Log "  Erfolgreich erstellt: $($network.name) (URI: $($network.uri))" -Level SUCCESS
-            return $network
+            Write-Log "  Erfolgreich erstellt: $($ns.name) (URI: $($ns.uri))" -Level SUCCESS
+            return $ns
         }
 
-        # --- Fall 3: Location Header vorhanden (REST-typisch bei 201 ohne Body) ---
+        # Fall 3: Location Header
         if ($locationHeader) {
             if ($locationHeader -like "/rest/tasks/*") {
                 Write-Log "  Task in Location Header ($locationHeader) – warte auf Abschluss..." -Level INFO
-                $networkUri = Wait-OneViewTask -Session $Session -TaskUri $locationHeader
-                $network = Invoke-RestMethod -Uri "$($Session.BaseUri)$networkUri" `
+                $nsUri = Wait-OneViewTask -Session $Session -TaskUri $locationHeader
+                $ns = Invoke-RestMethod -Uri "$($Session.BaseUri)$nsUri" `
                     -Method Get -Headers $Session.Headers -SkipCertificateCheck
             }
             else {
-                Write-Log "  Rufe Netzwerk von Location Header ab: $locationHeader" -Level INFO
-                $network = Invoke-RestMethod -Uri "$($Session.BaseUri)$locationHeader" `
+                Write-Log "  Rufe Network Set von Location Header ab: $locationHeader" -Level INFO
+                $ns = Invoke-RestMethod -Uri "$($Session.BaseUri)$locationHeader" `
                     -Method Get -Headers $Session.Headers -SkipCertificateCheck
             }
-            Write-Log "  Erfolgreich erstellt: $($network.name) (URI: $($network.uri))" -Level SUCCESS
-            return $network
+            Write-Log "  Erfolgreich erstellt: $($ns.name) (URI: $($ns.uri))" -Level SUCCESS
+            return $ns
         }
 
-        # --- Fall 4: Fallback – Netzwerk per Name suchen ---
-        Write-Log "  Kein verwertbarer Body/Location – suche erstelltes Netzwerk per Name..." -Level WARN
-        Start-Sleep -Milliseconds 500  # kurz warten damit OneView das Netzwerk indexiert
-        $encodedName = [System.Uri]::EscapeDataString($NetworkDefinition.Name)
-        $searchUri = "$($Session.BaseUri)/rest/ethernet-networks?filter=name%3D'$encodedName'"
+        # Fall 4: Fallback – per Name suchen
+        Write-Log "  Kein verwertbarer Body/Location – suche erstelltes Network Set per Name..." -Level WARN
+        Start-Sleep -Milliseconds 500
+        $encodedName = [System.Uri]::EscapeDataString($SetDefinition.Name)
+        $searchUri = "$($Session.BaseUri)/rest/network-sets?filter=name%3D'$encodedName'"
         $searchResult = Invoke-RestMethod -Uri $searchUri -Method Get `
             -Headers $Session.Headers -SkipCertificateCheck
 
         if ($searchResult.members -and $searchResult.members.Count -gt 0) {
-            $network = $searchResult.members[0]
-            Write-Log "  Per Suche gefunden: $($network.name) (URI: $($network.uri))" -Level SUCCESS
-            return $network
+            $ns = $searchResult.members[0]
+            Write-Log "  Per Suche gefunden: $($ns.name) (URI: $($ns.uri))" -Level SUCCESS
+            return $ns
         }
 
-        throw "Netzwerk wurde mglw. erstellt (HTTP $statusCode), konnte aber nicht abgerufen werden."
+        throw "Network Set wurde mglw. erstellt (HTTP $statusCode), konnte aber nicht abgerufen werden."
     }
     catch {
         $errorDetail = $_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction SilentlyContinue
         $errMsg = if ($errorDetail.message) { $errorDetail.message } else { $_.Exception.Message }
-        Write-Log "  Fehler beim Erstellen von '$($NetworkDefinition.Name)': $errMsg" -Level ERROR
+        Write-Log "  Fehler beim Erstellen von '$($SetDefinition.Name)': $errMsg" -Level ERROR
         throw
     }
 }
 
-function Update-EthernetNetwork {
+function Update-NetworkSet {
     <#
-    .SYNOPSIS  Aktualisiert ein bestehendes Ethernet Network via PUT /rest/ethernet-networks/{id}
+    .SYNOPSIS  Aktualisiert ein bestehendes Network Set via PUT /rest/network-sets/{id}
     .DESCRIPTION
         Vergleicht die Soll-Werte aus der Excel-Datei mit dem Ist-Zustand.
         Nur bei Abweichungen wird ein PUT ausgeführt.
@@ -454,48 +409,67 @@ function Update-EthernetNetwork {
     #>
     param(
         [Parameter(Mandatory)][hashtable]$Session,
-        [Parameter(Mandatory)][PSObject]$ExistingNetwork,
-        [Parameter(Mandatory)][hashtable]$NetworkDefinition
+        [Parameter(Mandatory)][PSObject]$ExistingSet,
+        [Parameter(Mandatory)][hashtable]$SetDefinition
     )
 
     $changes = @()
 
-    # Vergleich der Eigenschaften
-    if ([int]$ExistingNetwork.vlanId -ne [int]$NetworkDefinition.VlanId) {
-        $changes += "VlanId: $($ExistingNetwork.vlanId) -> $($NetworkDefinition.VlanId)"
+    # Vergleich networkUris (sortierte Mengenvergleich)
+    $existingUris = @($ExistingSet.networkUris | Sort-Object)
+    $desiredUris  = @($SetDefinition.NetworkUris | Sort-Object)
+    $existingJoined = ($existingUris -join ",")
+    $desiredJoined  = ($desiredUris -join ",")
+
+    if ($existingJoined -ne $desiredJoined) {
+        $addedCount   = ($desiredUris | Where-Object { $_ -notin $existingUris }).Count
+        $removedCount = ($existingUris | Where-Object { $_ -notin $desiredUris }).Count
+        $changes += "Networks: $addedCount hinzugefügt, $removedCount entfernt"
     }
-    if ($ExistingNetwork.purpose -ne $NetworkDefinition.Purpose) {
-        $changes += "Purpose: $($ExistingNetwork.purpose) -> $($NetworkDefinition.Purpose)"
+
+    # Vergleich nativeNetworkUri
+    $existingNative = if ($ExistingSet.nativeNetworkUri) { $ExistingSet.nativeNetworkUri } else { "" }
+    $desiredNative  = if ($SetDefinition.NativeNetworkUri) { $SetDefinition.NativeNetworkUri } else { "" }
+    if ($existingNative -ne $desiredNative) {
+        $changes += "NativeNetwork: geändert"
     }
-    if ($ExistingNetwork.ethernetNetworkType -ne $NetworkDefinition.EthernetNetworkType) {
-        $changes += "EthernetNetworkType: $($ExistingNetwork.ethernetNetworkType) -> $($NetworkDefinition.EthernetNetworkType)"
-    }
-    if ([bool]$ExistingNetwork.smartLink -ne [bool]$NetworkDefinition.SmartLink) {
-        $changes += "SmartLink: $($ExistingNetwork.smartLink) -> $($NetworkDefinition.SmartLink)"
-    }
-    if ([bool]$ExistingNetwork.privateNetwork -ne [bool]$NetworkDefinition.PrivateNetwork) {
-        $changes += "PrivateNetwork: $($ExistingNetwork.privateNetwork) -> $($NetworkDefinition.PrivateNetwork)"
+
+    # Vergleich Description
+    $existingDesc = if ($ExistingSet.description) { $ExistingSet.description } else { "" }
+    $desiredDesc  = if ($SetDefinition.Description) { $SetDefinition.Description } else { "" }
+    if ($existingDesc -ne $desiredDesc) {
+        $changes += "Description: '$existingDesc' -> '$desiredDesc'"
     }
 
     if ($changes.Count -eq 0) {
-        Write-Log "  KEINE ÄNDERUNG: '$($NetworkDefinition.Name)' ist bereits aktuell." -Level INFO
+        Write-Log "  KEINE ÄNDERUNG: '$($SetDefinition.Name)' ist bereits aktuell." -Level INFO
         return $false
     }
 
-    Write-Log "  AKTUALISIERE: '$($NetworkDefinition.Name)' – $($changes.Count) Änderung(en):" -Level INFO
+    Write-Log "  AKTUALISIERE: '$($SetDefinition.Name)' – $($changes.Count) Änderung(en):" -Level INFO
     foreach ($c in $changes) {
         Write-Log "    - $c" -Level INFO
     }
 
-    # Bestehendes Netzwerk-Objekt klonen und Werte aktualisieren
-    $uri = "$($Session.BaseUri)$($ExistingNetwork.uri)"
+    # Bestehendes Objekt klonen und aktualisieren
+    $uri = "$($Session.BaseUri)$($ExistingSet.uri)"
 
-    $updateBody = $ExistingNetwork | ConvertTo-Json -Depth 10 | ConvertFrom-Json
-    $updateBody.vlanId              = [int]$NetworkDefinition.VlanId
-    $updateBody.purpose             = $NetworkDefinition.Purpose
-    $updateBody.ethernetNetworkType = $NetworkDefinition.EthernetNetworkType
-    $updateBody.smartLink           = [bool]$NetworkDefinition.SmartLink
-    $updateBody.privateNetwork      = [bool]$NetworkDefinition.PrivateNetwork
+    $updateBody = $ExistingSet | ConvertTo-Json -Depth 10 | ConvertFrom-Json
+    $updateBody.networkUris = @($SetDefinition.NetworkUris)
+
+    if (-not [string]::IsNullOrWhiteSpace($SetDefinition.NativeNetworkUri)) {
+        $updateBody.nativeNetworkUri = $SetDefinition.NativeNetworkUri
+    }
+    else {
+        $updateBody.nativeNetworkUri = $null
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($SetDefinition.Description)) {
+        $updateBody.description = $SetDefinition.Description
+    }
+    else {
+        $updateBody.description = ""
+    }
 
     $jsonBody = $updateBody | ConvertTo-Json -Depth 10
 
@@ -509,25 +483,18 @@ function Update-EthernetNetwork {
             -Body $jsonBody `
             -SkipCertificateCheck | Out-Null
 
-        Write-Log "  Erfolgreich aktualisiert: '$($NetworkDefinition.Name)'" -Level SUCCESS
+        Write-Log "  Erfolgreich aktualisiert: '$($SetDefinition.Name)'" -Level SUCCESS
         return $true
     }
     catch {
         $errorDetail = $_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction SilentlyContinue
         $errMsg = if ($errorDetail.message) { $errorDetail.message } else { $_.Exception.Message }
-        Write-Log "  Fehler beim Aktualisieren von '$($NetworkDefinition.Name)': $errMsg" -Level ERROR
+        Write-Log "  Fehler beim Aktualisieren von '$($SetDefinition.Name)': $errMsg" -Level ERROR
         throw
     }
 }
 
 function Set-ConnectionTemplateBandwidth {
-    <#
-    .SYNOPSIS  Bandwidth setzen via GET + PUT /rest/connection-templates/{id}
-    .DESCRIPTION
-        Die API erwartet Bandwidth in Mbps.
-        Im Excel werden Gb/s angegeben (wie in der OneView GUI).
-        Umrechnung: Mbps = Gb/s * 1000
-    #>
     param(
         [Parameter(Mandatory)][hashtable]$Session,
         [Parameter(Mandatory)][string]$ConnectionTemplateUri,
@@ -540,16 +507,13 @@ function Set-ConnectionTemplateBandwidth {
     $maximumMbps = [int]($MaximumBandwidthGb * 1000)
 
     try {
-        # Aktuelles Template abrufen
         $template = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
 
-        # Bandwidth aktualisieren
         $template.bandwidth.typicalBandwidth = $typicalMbps
         $template.bandwidth.maximumBandwidth = $maximumMbps
 
         $jsonBody = $template | ConvertTo-Json -Depth 10
 
-        # If-Match: * erzwingt Update ohne ETag-Prüfung (laut API-Doku unterstützt)
         $putHeaders = $Session.Headers.Clone()
         $putHeaders["If-Match"] = "*"
 
@@ -570,67 +534,7 @@ function Set-ConnectionTemplateBandwidth {
     }
 }
 
-function Add-NetworkToNetworkSet {
-    <#
-    .SYNOPSIS  Fügt ein Ethernet Network einem bestehenden Network Set hinzu.
-    .DESCRIPTION
-        1. GET  /rest/network-sets/{id}   – aktuellen Stand abrufen
-        2. networkUris um die neue Network-URI ergänzen
-        3. PUT  /rest/network-sets/{id}   – aktualisiertes Network Set speichern
-    #>
-    param(
-        [Parameter(Mandatory)][hashtable]$Session,
-        [Parameter(Mandatory)][PSObject]$NetworkSet,
-        [Parameter(Mandatory)][string]$NetworkUri
-    )
-
-    $setUri = "$($Session.BaseUri)$($NetworkSet.uri)"
-
-    try {
-        # Aktuellen Stand abrufen
-        $currentSet = Invoke-RestMethod -Uri $setUri -Method Get -Headers $Session.Headers -SkipCertificateCheck
-
-        # Prüfen ob Network bereits enthalten
-        if ($currentSet.networkUris -contains $NetworkUri) {
-            Write-Log "  Network bereits im Network Set '$($NetworkSet.name)' enthalten." -Level INFO
-            return
-        }
-
-        # Network URI hinzufügen
-        $updatedUris = @($currentSet.networkUris) + $NetworkUri
-        $currentSet.networkUris = $updatedUris
-
-        $jsonBody = $currentSet | ConvertTo-Json -Depth 10
-
-        # If-Match: * erzwingt Update ohne ETag-Prüfung (laut API-Doku unterstützt)
-        $putHeaders = $Session.Headers.Clone()
-        $putHeaders["If-Match"] = "*"
-
-        Invoke-RestMethod -Uri $setUri `
-            -Method Put `
-            -Headers $putHeaders `
-            -Body $jsonBody `
-            -SkipCertificateCheck | Out-Null
-
-        Write-Log "  Zum Network Set '$($NetworkSet.name)' hinzugefügt." -Level SUCCESS
-    }
-    catch {
-        $errorDetail = $_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction SilentlyContinue
-        $errMsg = if ($errorDetail.message) { $errorDetail.message } else { $_.Exception.Message }
-        Write-Log "  Fehler beim Hinzufügen zum Network Set '$($NetworkSet.name)': $errMsg" -Level WARN
-    }
-}
-
 function Wait-OneViewTask {
-    <#
-    .SYNOPSIS  Wartet auf den Abschluss einer asynchronen OneView Task.
-    .DESCRIPTION
-        POST /rest/ethernet-networks (und andere Ressourcen) antwortet bei längeren
-        Operationen mit HTTP 202 Accepted und einem Task-Objekt statt dem fertigen
-        Ressourcen-Objekt. Diese Funktion pollt GET /rest/tasks/{id} bis die Task
-        den Status "Completed" oder einen Fehlerstatus erreicht.
-        Bei Erfolg gibt sie die URI der erstellten Ressource zurück.
-    #>
     param(
         [Parameter(Mandatory)][hashtable]$Session,
         [Parameter(Mandatory)][string]$TaskUri,
@@ -646,7 +550,6 @@ function Wait-OneViewTask {
 
         switch ($task.taskState) {
             "Completed" {
-                # Ressourcen-URI des erstellten Objekts zurückgeben
                 $resourceUri = $task.associatedResource.resourceUri
                 if ([string]::IsNullOrWhiteSpace($resourceUri)) {
                     throw "Task abgeschlossen, aber keine Ressourcen-URI in 'associatedResource.resourceUri' gefunden."
@@ -657,7 +560,6 @@ function Wait-OneViewTask {
                 $errMsg = if ($task.taskErrors) { ($task.taskErrors | ForEach-Object { $_.message }) -join "; " } else { $task.taskState }
                 throw "OneView Task fehlgeschlagen ($($task.taskState)): $errMsg"
             }
-            # "Running", "Starting", "Pending" → weiter warten
         }
 
         Start-Sleep -Milliseconds $PollingIntervalMs
@@ -667,15 +569,6 @@ function Wait-OneViewTask {
 }
 
 function Add-ResourceToScope {
-    <#
-    .SYNOPSIS  Weist eine Ressource einem Scope zu.
-    .DESCRIPTION
-        PATCH /rest/scopes/{id}
-        Body: {
-            "type":              "ScopePatchDto",
-            "addedResourceUris": [ "<network-uri>" ]
-        }
-    #>
     param(
         [Parameter(Mandatory)][hashtable]$Session,
         [Parameter(Mandatory)][PSObject]$Scope,
@@ -709,7 +602,7 @@ function Add-ResourceToScope {
 #  Excel Import & Validierung
 # ============================================================================
 
-function Import-VlanDataFromExcel {
+function Import-NetworkSetDataFromExcel {
     param(
         [Parameter(Mandatory)][string]$ExcelPath,
         [Parameter(Mandatory)][string]$SheetName,
@@ -730,76 +623,52 @@ function Import-VlanDataFromExcel {
 
     # Versuch 1: Standard-Import (Header in Zeile 1)
     $rawData = Import-Excel -Path $ExcelPath -WorksheetName $SheetName -ErrorAction SilentlyContinue
-    
-    # Prüfen ob die Spalte "NetworkName" erkannt wurde
+
+    # Prüfen ob die Spalte "NetworkSetName" erkannt wurde
     if ($rawData -and $rawData.Count -gt 0) {
         $headers = @($rawData[0].PSObject.Properties.Name)
-        if ($headers -notcontains "NetworkName") {
-            # Header nicht in Zeile 1 → vermutlich Titelzeile vorhanden, ab Zeile 2 lesen
+        if ($headers -notcontains "NetworkSetName") {
             Write-Log "  Titelzeile erkannt – lese ab Zeile 2." -Level INFO
             $rawData = Import-Excel -Path $ExcelPath -WorksheetName $SheetName -StartRow 2 -ErrorAction SilentlyContinue
         }
     }
 
     if (-not $rawData -or $rawData.Count -eq 0) {
-        throw "Keine Daten in der Excel-Datei gefunden (Sheet: $SheetName). Bitte prüfen Sie, dass die Spalte 'NetworkName' vorhanden ist."
+        throw "Keine Daten in der Excel-Datei gefunden (Sheet: $SheetName). Bitte prüfen Sie, dass die Spalte 'NetworkSetName' vorhanden ist."
     }
 
     Write-Log "  $($rawData.Count) Zeilen aus Excel gelesen."
 
-    $validNetworks = [System.Collections.Generic.List[hashtable]]::new()
+    $validSets = [System.Collections.Generic.List[hashtable]]::new()
     $rowNum = 1
 
     foreach ($row in $rawData) {
         $rowNum++
 
         # Name ist Pflicht
-        if ([string]::IsNullOrWhiteSpace($row.NetworkName)) {
-            Write-Log "  Zeile ${rowNum}: NetworkName fehlt – übersprungen." -Level WARN
+        if ([string]::IsNullOrWhiteSpace($row.NetworkSetName)) {
+            Write-Log "  Zeile ${rowNum}: NetworkSetName fehlt – übersprungen." -Level WARN
             continue
         }
 
-        # VLAN-ID validieren
-        $vlanId = 0
-        if ($null -ne $row.VlanId -and $row.VlanId.ToString().Trim() -ne "") {
-            $vlanId = [int]$row.VlanId
-        }
-
-        # EthernetNetworkType
-        $ethType = if (-not [string]::IsNullOrWhiteSpace($row.EthernetNetworkType)) {
-            $row.EthernetNetworkType.Trim()
-        } else { $Defaults.EthernetNetworkType }
-        if ($ethType -notin $ValidEthernetNetworkTypes) {
-            Write-Log "  Zeile $rowNum ($($row.NetworkName)): Ungültiger EthernetNetworkType '$ethType' – verwende Default." -Level WARN
-            $ethType = $Defaults.EthernetNetworkType
-        }
-
-        # Für Tagged muss VLAN-ID zwischen 1-4094 sein
-        if ($ethType -eq "Tagged" -and ($vlanId -lt 1 -or $vlanId -gt 4094)) {
-            Write-Log "  Zeile $rowNum ($($row.NetworkName)): VLAN-ID $vlanId ungültig für Tagged (1-4094) – übersprungen." -Level ERROR
+        # Networks ist Pflicht (Semikolon-getrennte Liste)
+        if ([string]::IsNullOrWhiteSpace($row.Networks)) {
+            Write-Log "  Zeile ${rowNum} ($($row.NetworkSetName)): Networks fehlt – übersprungen." -Level WARN
             continue
         }
 
-        # Purpose
-        $purpose = if (-not [string]::IsNullOrWhiteSpace($row.Purpose)) {
-            $row.Purpose.Trim()
-        } else { $Defaults.Purpose }
-        if ($purpose -notin $ValidPurposes) {
-            Write-Log "  Zeile $rowNum ($($row.NetworkName)): Ungültiger Purpose '$purpose' – verwende Default." -Level WARN
-            $purpose = $Defaults.Purpose
+        $networkNames = @($row.Networks -split '\s*;\s*' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+        if ($networkNames.Count -eq 0) {
+            Write-Log "  Zeile ${rowNum} ($($row.NetworkSetName)): Keine gültigen Netzwerk-Namen – übersprungen." -Level WARN
+            continue
         }
 
-        # SmartLink
-        $smartLink = if ($null -ne $row.SmartLink -and $row.SmartLink.ToString().Trim() -ne "") {
-            [System.Convert]::ToBoolean($row.SmartLink)
-        } else { $Defaults.SmartLink }
+        # NativeNetwork (optional)
+        $nativeNetwork = if (-not [string]::IsNullOrWhiteSpace($row.NativeNetwork)) {
+            $row.NativeNetwork.Trim()
+        } else { "" }
 
-        # PrivateNetwork
-        $privateNetwork = if ($null -ne $row.PrivateNetwork -and $row.PrivateNetwork.ToString().Trim() -ne "") {
-            [System.Convert]::ToBoolean($row.PrivateNetwork)
-        } else { $Defaults.PrivateNetwork }
-
-        # Bandwidth (Gb/s – wie in der OneView GUI)
+        # Bandwidth (Gb/s)
         $bwPreferred = if ($null -ne $row.PreferredBandwidthGb -and $row.PreferredBandwidthGb.ToString().Trim() -ne "") {
             [double]$row.PreferredBandwidthGb
         } else { $Defaults.PreferredBandwidthGb }
@@ -813,44 +682,24 @@ function Import-VlanDataFromExcel {
             $row.Scope.Trim()
         } else { "" }
 
-        # Network Set (optional)
-        $networkSet = if (-not [string]::IsNullOrWhiteSpace($row.NetworkSet)) {
-            $row.NetworkSet.Trim()
-        } else { "" }
-
-        # IPv4 / IPv6 Subnet ID (optional)
-        $ipv4SubnetId = if (-not [string]::IsNullOrWhiteSpace($row.IPv4SubnetId)) {
-            $row.IPv4SubnetId.Trim()
-        } else { "" }
-
-        $ipv6SubnetId = if (-not [string]::IsNullOrWhiteSpace($row.IPv6SubnetId)) {
-            $row.IPv6SubnetId.Trim()
-        } else { "" }
-
         # Description
         $description = if (-not [string]::IsNullOrWhiteSpace($row.Description)) {
             $row.Description.Trim()
         } else { "" }
 
-        $validNetworks.Add(@{
-            Name                 = $row.NetworkName.Trim()
-            VlanId               = $vlanId
-            Purpose              = $purpose
-            EthernetNetworkType  = $ethType
-            SmartLink            = $smartLink
-            PrivateNetwork       = $privateNetwork
+        $validSets.Add(@{
+            Name                 = $row.NetworkSetName.Trim()
+            NetworkNames         = $networkNames
+            NativeNetwork        = $nativeNetwork
             PreferredBandwidthGb = $bwPreferred
             MaximumBandwidthGb   = $bwMaximum
             Scope                = $scope
-            NetworkSet           = $networkSet
-            IPv4SubnetId         = $ipv4SubnetId
-            IPv6SubnetId         = $ipv6SubnetId
             Description          = $description
         })
     }
 
-    Write-Log "  $($validNetworks.Count) gültige Netzwerk-Definitionen nach Validierung." -Level INFO
-    return $validNetworks
+    Write-Log "  $($validSets.Count) gültige Network-Set-Definitionen nach Validierung." -Level INFO
+    return $validSets
 }
 
 # ============================================================================
@@ -860,7 +709,7 @@ function Import-VlanDataFromExcel {
 function Main {
     Write-Host ""
     Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║   HPE OneView – Ethernet Networks aus Excel erstellen       ║" -ForegroundColor Cyan
+    Write-Host "║   HPE OneView – Network Sets aus Excel erstellen            ║" -ForegroundColor Cyan
     Write-Host "║   Über die RESTful API (ohne HPE OneView PowerShell Modul)  ║" -ForegroundColor Cyan
     Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
     Write-Host ""
@@ -878,27 +727,33 @@ function Main {
     # -------------------------------------------
     # 2. Excel-Pfad auflösen
     # -------------------------------------------
-    $excelPath = $config.ExcelFilePath
+    $excelPath = if ($config.NetworkSetExcelFilePath) { $config.NetworkSetExcelFilePath } else { $config.ExcelFilePath }
     if (-not [System.IO.Path]::IsPathRooted($excelPath)) {
         $excelPath = Join-Path $PSScriptRoot $excelPath
     }
     $excelPath = [System.IO.Path]::GetFullPath($excelPath)
 
+    $sheetName = if ($config.NetworkSetExcelSheetName) { $config.NetworkSetExcelSheetName } else { "NetworkSets" }
+
     $defaults = @{
-        Purpose              = $config.DefaultSettings.Purpose
-        SmartLink            = $config.DefaultSettings.SmartLink
-        PrivateNetwork       = $config.DefaultSettings.PrivateNetwork
-        EthernetNetworkType  = $config.DefaultSettings.EthernetNetworkType
-        PreferredBandwidthGb = $config.DefaultSettings.PreferredBandwidthGb
-        MaximumBandwidthGb   = $config.DefaultSettings.MaximumBandwidthGb
+        PreferredBandwidthGb = 2.5
+        MaximumBandwidthGb   = 20
+    }
+    if ($config.NetworkSetDefaultSettings) {
+        if ($null -ne $config.NetworkSetDefaultSettings.PreferredBandwidthGb) {
+            $defaults.PreferredBandwidthGb = $config.NetworkSetDefaultSettings.PreferredBandwidthGb
+        }
+        if ($null -ne $config.NetworkSetDefaultSettings.MaximumBandwidthGb) {
+            $defaults.MaximumBandwidthGb = $config.NetworkSetDefaultSettings.MaximumBandwidthGb
+        }
     }
 
     # -------------------------------------------
-    # 3. VLAN-Daten aus Excel importieren
+    # 3. Network-Set-Daten aus Excel importieren
     # -------------------------------------------
     try {
-        $networks = Import-VlanDataFromExcel -ExcelPath $excelPath `
-            -SheetName $config.ExcelSheetName `
+        $networkSets = Import-NetworkSetDataFromExcel -ExcelPath $excelPath `
+            -SheetName $sheetName `
             -Defaults $defaults
     }
     catch {
@@ -907,28 +762,29 @@ function Main {
         return
     }
 
-    if (-not $networks -or $networks.Count -eq 0) {
-        Write-Log "Keine Netzwerke zum Erstellen gefunden." -Level WARN
+    if (-not $networkSets -or $networkSets.Count -eq 0) {
+        Write-Log "Keine Network Sets zum Erstellen gefunden." -Level WARN
         Save-Log
         return
     }
 
     # Zusammenfassung anzeigen
     Write-Host ""
-    Write-Host "Folgende Ethernet Networks werden erstellt:" -ForegroundColor Yellow
+    Write-Host "Folgende Network Sets werden verarbeitet:" -ForegroundColor Yellow
     Write-Host ("-" * 105)
-    Write-Host ("{0,-30} {1,-7} {2,-10} {3,-13} {4,-8} {5,-8} {6,-15} {7,-15}" -f `
-        "Name", "VLAN", "Typ", "Purpose", "BW(Gb)", "Max(Gb)", "Scope", "Network Set")
+    Write-Host ("{0,-30} {1,-40} {2,-20} {3,-8}" -f `
+        "Name", "Networks", "Native", "BW(Gb)")
     Write-Host ("-" * 105)
-    foreach ($net in $networks) {
-        Write-Host ("{0,-30} {1,-7} {2,-10} {3,-13} {4,-8} {5,-8} {6,-15} {7,-15}" -f `
-            $net.Name, $net.VlanId, $net.EthernetNetworkType, $net.Purpose, `
-            $net.PreferredBandwidthGb, $net.MaximumBandwidthGb, `
-            $(if ($net.Scope) { $net.Scope } else { "-" }), `
-            $(if ($net.NetworkSet) { $net.NetworkSet } else { "-" }))
+    foreach ($setDef in $networkSets) {
+        $netStr = ($setDef.NetworkNames -join "; ")
+        if ($netStr.Length -gt 37) { $netStr = $netStr.Substring(0, 37) + "..." }
+        $nativeStr = if ($setDef.NativeNetwork) { $setDef.NativeNetwork } else { "-" }
+        if ($nativeStr.Length -gt 17) { $nativeStr = $nativeStr.Substring(0, 17) + "..." }
+        Write-Host ("{0,-30} {1,-40} {2,-20} {3,-8}" -f `
+            $setDef.Name, $netStr, $nativeStr, $setDef.PreferredBandwidthGb)
     }
     Write-Host ("-" * 105)
-    Write-Host "Gesamt: $($networks.Count) Netzwerk(e)`n" -ForegroundColor Yellow
+    Write-Host "Gesamt: $($networkSets.Count) Network Set(s)`n" -ForegroundColor Yellow
 
     # -------------------------------------------
     # 4. Benutzerbestätigung
@@ -954,7 +810,7 @@ function Main {
     }
 
     # -------------------------------------------
-    # 6. Für jede Appliance: Netzwerke erstellen
+    # 6. Für jede Appliance: Network Sets erstellen / aktualisieren
     # -------------------------------------------
     foreach ($appliance in $config.OneViewAppliances) {
         Write-Host ""
@@ -973,83 +829,115 @@ function Main {
 
             # 6b. Existierende Ressourcen abrufen
             $existingNetworks = Get-ExistingEthernetNetworks -Session $session
-            $existingNetworkLookup = @{}
-            foreach ($en in $existingNetworks) {
-                $existingNetworkLookup[$en.name] = $en
+            $existingNetworkSets = Get-ExistingNetworkSets -Session $session
+            $existingScopes = Get-ExistingScopes -Session $session
+
+            # Lookup-Tabellen
+            $networkNameToUri = @{}
+            foreach ($net in $existingNetworks) {
+                $networkNameToUri[$net.name] = $net.uri
             }
 
-            $existingNetworkSets = Get-ExistingNetworkSets -Session $session
-            $existingScopes      = Get-ExistingScopes -Session $session
-
-            # Lookup-Tabellen für Network Sets und Scopes (Name → Objekt)
             $networkSetLookup = @{}
             foreach ($ns in $existingNetworkSets) {
                 $networkSetLookup[$ns.name] = $ns
             }
+
             $scopeLookup = @{}
             foreach ($sc in $existingScopes) {
                 $scopeLookup[$sc.name] = $sc
             }
 
-            # 6c. Netzwerke erstellen / aktualisieren
-            foreach ($netDef in $networks) {
+            # 6c. Network Sets verarbeiten
+            foreach ($setDef in $networkSets) {
 
                 if ($WhatIfPreference) {
-                    Write-Log "  [WhatIf] Würde verarbeiten: $($netDef.Name) (VLAN $($netDef.VlanId))" -Level INFO
-                    $script:SkippedNetworks++
+                    Write-Log "  [WhatIf] Würde verarbeiten: $($setDef.Name)" -Level INFO
+                    $script:SkippedSets++
                     continue
                 }
 
-                # Prüfen ob Netzwerk bereits existiert
-                $existingNetwork = $null
-                if ($existingNetworkLookup.ContainsKey($netDef.Name)) {
-                    $existingNetwork = $existingNetworkLookup[$netDef.Name]
+                # Netzwerk-Namen zu URIs auflösen
+                $resolvedUris = [System.Collections.Generic.List[string]]::new()
+                $unresolvedNames = @()
+                foreach ($netName in $setDef.NetworkNames) {
+                    if ($networkNameToUri.ContainsKey($netName)) {
+                        $resolvedUris.Add($networkNameToUri[$netName])
+                    }
+                    else {
+                        $unresolvedNames += $netName
+                    }
                 }
 
-                if ($existingNetwork) {
-                    # --- Bestehendes Netzwerk: Vergleichen und ggf. aktualisieren ---
+                if ($unresolvedNames.Count -gt 0) {
+                    Write-Log "  Warnung: $($unresolvedNames.Count) Netzwerk(e) nicht gefunden: $($unresolvedNames -join ', ')" -Level WARN
+                }
+
+                if ($resolvedUris.Count -eq 0) {
+                    Write-Log "  FEHLER: Kein einziges Netzwerk aufgelöst für '$($setDef.Name)' – übersprungen." -Level ERROR
+                    $script:FailedSets++
+                    continue
+                }
+
+                # Native Network auflösen
+                $nativeUri = ""
+                if (-not [string]::IsNullOrWhiteSpace($setDef.NativeNetwork)) {
+                    if ($networkNameToUri.ContainsKey($setDef.NativeNetwork)) {
+                        $nativeUri = $networkNameToUri[$setDef.NativeNetwork]
+                        # Sicherstellen, dass Native in der Netzwerk-Liste ist
+                        if ($nativeUri -notin $resolvedUris) {
+                            $resolvedUris.Add($nativeUri)
+                            Write-Log "  Native Network '$($setDef.NativeNetwork)' wurde automatisch zur Netzwerk-Liste hinzugefügt." -Level INFO
+                        }
+                    }
+                    else {
+                        Write-Log "  Warnung: Native Network '$($setDef.NativeNetwork)' nicht gefunden – wird nicht gesetzt." -Level WARN
+                    }
+                }
+
+                $setDefResolved = @{
+                    Name                 = $setDef.Name
+                    NetworkUris          = @($resolvedUris)
+                    NativeNetworkUri     = $nativeUri
+                    PreferredBandwidthGb = $setDef.PreferredBandwidthGb
+                    MaximumBandwidthGb   = $setDef.MaximumBandwidthGb
+                    Scope                = $setDef.Scope
+                    Description          = $setDef.Description
+                }
+
+                # Prüfen ob Network Set bereits existiert
+                $existingSet = $null
+                if ($networkSetLookup.ContainsKey($setDef.Name)) {
+                    $existingSet = $networkSetLookup[$setDef.Name]
+                }
+
+                if ($existingSet) {
+                    # --- Bestehendes Network Set: Vergleichen und ggf. aktualisieren ---
                     try {
-                        $wasUpdated = Update-EthernetNetwork -Session $session `
-                            -ExistingNetwork $existingNetwork `
-                            -NetworkDefinition $netDef
+                        $wasUpdated = Update-NetworkSet -Session $session `
+                            -ExistingSet $existingSet `
+                            -SetDefinition $setDefResolved
 
                         Start-Sleep -Milliseconds 1500
 
-                        # Bandwidth auch für bestehende Netzwerke prüfen/aktualisieren
-                        if ($existingNetwork.connectionTemplateUri) {
+                        # Bandwidth prüfen/aktualisieren
+                        if ($existingSet.connectionTemplateUri) {
                             Set-ConnectionTemplateBandwidth -Session $session `
-                                -ConnectionTemplateUri $existingNetwork.connectionTemplateUri `
-                                -PreferredBandwidthGb $netDef.PreferredBandwidthGb `
-                                -MaximumBandwidthGb $netDef.MaximumBandwidthGb
-                        }
-
-                        # Network Set(s) zuweisen (add-only)
-                        if (-not [string]::IsNullOrWhiteSpace($netDef.NetworkSet)) {
-                            $setNames = $netDef.NetworkSet -split '\s*;\s*'
-                            foreach ($setName in $setNames) {
-                                $setName = $setName.Trim()
-                                if ([string]::IsNullOrWhiteSpace($setName)) { continue }
-                                if ($networkSetLookup.ContainsKey($setName)) {
-                                    Add-NetworkToNetworkSet -Session $session `
-                                        -NetworkSet $networkSetLookup[$setName] `
-                                        -NetworkUri $existingNetwork.uri
-                                }
-                                else {
-                                    Write-Log "  Warnung: Network Set '$setName' nicht gefunden – Zuweisung übersprungen." -Level WARN
-                                }
-                            }
+                                -ConnectionTemplateUri $existingSet.connectionTemplateUri `
+                                -PreferredBandwidthGb $setDef.PreferredBandwidthGb `
+                                -MaximumBandwidthGb $setDef.MaximumBandwidthGb
                         }
 
                         # Scope(s) zuweisen (add-only)
-                        if (-not [string]::IsNullOrWhiteSpace($netDef.Scope)) {
-                            $scopeNames = $netDef.Scope -split '\s*;\s*'
+                        if (-not [string]::IsNullOrWhiteSpace($setDef.Scope)) {
+                            $scopeNames = $setDef.Scope -split '\s*;\s*'
                             foreach ($scName in $scopeNames) {
                                 $scName = $scName.Trim()
                                 if ([string]::IsNullOrWhiteSpace($scName)) { continue }
                                 if ($scopeLookup.ContainsKey($scName)) {
                                     Add-ResourceToScope -Session $session `
                                         -Scope $scopeLookup[$scName] `
-                                        -ResourceUri $existingNetwork.uri
+                                        -ResourceUri $existingSet.uri
                                 }
                                 else {
                                     Write-Log "  Warnung: Scope '$scName' nicht gefunden – Zuweisung übersprungen." -Level WARN
@@ -1058,70 +946,52 @@ function Main {
                         }
 
                         if ($wasUpdated) {
-                            $script:UpdatedNetworks++
+                            $script:UpdatedSets++
                         }
                         else {
-                            $script:SkippedNetworks++
+                            $script:SkippedSets++
                         }
                     }
                     catch {
-                        $script:FailedNetworks++
+                        $script:FailedSets++
                         continue
                     }
                 }
                 else {
-                    # --- Neues Netzwerk erstellen ---
+                    # --- Neues Network Set erstellen ---
                     try {
-                        # I. Ethernet Network erstellen
-                        $createdNetwork = New-EthernetNetwork -Session $session -NetworkDefinition $netDef
+                        # I. Network Set erstellen
+                        $createdSet = New-NetworkSet -Session $session -SetDefinition $setDefResolved
 
-                        # Sicherheitsprüfung: Netzwerk-Objekt muss URI enthalten
-                        if (-not $createdNetwork -or -not $createdNetwork.uri) {
-                            Write-Log "  FEHLER: Kein gültiges Netzwerk-Objekt zurückerhalten – Folgeschritte übersprungen." -Level ERROR
-                            $script:FailedNetworks++
+                        if (-not $createdSet -or -not $createdSet.uri) {
+                            Write-Log "  FEHLER: Kein gültiges Network-Set-Objekt zurückerhalten – Folgeschritte übersprungen." -Level ERROR
+                            $script:FailedSets++
                             continue
                         }
 
                         Start-Sleep -Milliseconds 1500
 
                         # II. Bandwidth setzen
-                        if ($createdNetwork.connectionTemplateUri) {
+                        if ($createdSet.connectionTemplateUri) {
                             Set-ConnectionTemplateBandwidth -Session $session `
-                                -ConnectionTemplateUri $createdNetwork.connectionTemplateUri `
-                                -PreferredBandwidthGb $netDef.PreferredBandwidthGb `
-                                -MaximumBandwidthGb $netDef.MaximumBandwidthGb
+                                -ConnectionTemplateUri $createdSet.connectionTemplateUri `
+                                -PreferredBandwidthGb $setDef.PreferredBandwidthGb `
+                                -MaximumBandwidthGb $setDef.MaximumBandwidthGb
                         }
                         else {
-                            Write-Log "  WARNUNG: connectionTemplateUri fehlt im Netzwerk-Objekt – Bandwidth nicht gesetzt." -Level WARN
+                            Write-Log "  WARNUNG: connectionTemplateUri fehlt im Network-Set-Objekt – Bandwidth nicht gesetzt." -Level WARN
                         }
 
-                        # III. Network Set(s) zuweisen
-                        if (-not [string]::IsNullOrWhiteSpace($netDef.NetworkSet)) {
-                            $setNames = $netDef.NetworkSet -split '\s*;\s*'
-                            foreach ($setName in $setNames) {
-                                $setName = $setName.Trim()
-                                if ([string]::IsNullOrWhiteSpace($setName)) { continue }
-                                if ($networkSetLookup.ContainsKey($setName)) {
-                                    Add-NetworkToNetworkSet -Session $session `
-                                        -NetworkSet $networkSetLookup[$setName] `
-                                        -NetworkUri $createdNetwork.uri
-                                }
-                                else {
-                                    Write-Log "  Warnung: Network Set '$setName' nicht gefunden – Zuweisung übersprungen." -Level WARN
-                                }
-                            }
-                        }
-
-                        # IV. Scope(s) zuweisen
-                        if (-not [string]::IsNullOrWhiteSpace($netDef.Scope)) {
-                            $scopeNames = $netDef.Scope -split '\s*;\s*'
+                        # III. Scope(s) zuweisen
+                        if (-not [string]::IsNullOrWhiteSpace($setDef.Scope)) {
+                            $scopeNames = $setDef.Scope -split '\s*;\s*'
                             foreach ($scName in $scopeNames) {
                                 $scName = $scName.Trim()
                                 if ([string]::IsNullOrWhiteSpace($scName)) { continue }
                                 if ($scopeLookup.ContainsKey($scName)) {
                                     Add-ResourceToScope -Session $session `
                                         -Scope $scopeLookup[$scName] `
-                                        -ResourceUri $createdNetwork.uri
+                                        -ResourceUri $createdSet.uri
                                 }
                                 else {
                                     Write-Log "  Warnung: Scope '$scName' nicht gefunden – Zuweisung übersprungen." -Level WARN
@@ -1129,10 +999,10 @@ function Main {
                             }
                         }
 
-                        $script:CreatedNetworks++
+                        $script:CreatedSets++
                     }
                     catch {
-                        $script:FailedNetworks++
+                        $script:FailedSets++
                         continue
                     }
                 }
@@ -1155,10 +1025,10 @@ function Main {
     Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
     Write-Host "║                    Zusammenfassung                           ║" -ForegroundColor Cyan
     Write-Host "╠══════════════════════════════════════════════════════════════╣" -ForegroundColor Cyan
-    Write-Host ("║  Erstellt:       {0,-43}║" -f $script:CreatedNetworks) -ForegroundColor Green
-    Write-Host ("║  Aktualisiert:   {0,-43}║" -f $script:UpdatedNetworks) -ForegroundColor Cyan
-    Write-Host ("║  Übersprungen:   {0,-43}║" -f $script:SkippedNetworks) -ForegroundColor Yellow
-    Write-Host ("║  Fehlgeschlagen: {0,-43}║" -f $script:FailedNetworks) -ForegroundColor Red
+    Write-Host ("║  Erstellt:       {0,-43}║" -f $script:CreatedSets) -ForegroundColor Green
+    Write-Host ("║  Aktualisiert:   {0,-43}║" -f $script:UpdatedSets) -ForegroundColor Cyan
+    Write-Host ("║  Übersprungen:   {0,-43}║" -f $script:SkippedSets) -ForegroundColor Yellow
+    Write-Host ("║  Fehlgeschlagen: {0,-43}║" -f $script:FailedSets) -ForegroundColor Red
     Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
 
     Save-Log

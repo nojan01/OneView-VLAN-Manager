@@ -1,36 +1,36 @@
 <#
 .SYNOPSIS
-    Exportiert alle Ethernet Networks aus HPE OneView in eine Excel-Datei.
+    Exportiert alle Network Sets aus HPE OneView in eine Excel-Datei.
 
 .DESCRIPTION
-    Dieses Skript liest alle Ethernet Networks, Network Sets, Scopes und
+    Dieses Skript liest alle Network Sets, Ethernet Networks, Scopes und
     Connection Templates über die HPE OneView RESTful API aus und exportiert
-    die Daten in eine Excel-Datei mit identischem Aufbau wie die Import-Vorlage.
+    die Daten in eine Excel-Datei.
 
-    Die exportierte Datei kann direkt als Eingabe für Create-EthernetNetworks.ps1
-    verwendet werden (z.B. um Netzwerke auf eine andere Appliance zu übertragen).
+    Die exportierte Datei kann direkt als Eingabe für Create-NetworkSets.ps1
+    verwendet werden (z.B. um Network Sets auf eine andere Appliance zu übertragen).
 
     Ablauf:
     1. Konfiguration aus config.json laden
     2. Authentifizierung an der OneView Appliance (REST API)
-    3. Ethernet Networks abrufen     (GET /rest/ethernet-networks)
-    4. Network Sets abrufen          (GET /rest/network-sets)
-    5. Scopes abrufen                (GET /rest/scopes)
-    6. Connection Templates abrufen  (GET /rest/connection-templates)
+    3. Network Sets abrufen           (GET /rest/network-sets)
+    4. Ethernet Networks abrufen      (GET /rest/ethernet-networks)
+    5. Scopes abrufen                 (GET /rest/scopes)
+    6. Connection Templates abrufen   (GET /rest/connection-templates)
     7. Daten zusammenführen und in Excel exportieren
 
 .PARAMETER ConfigPath
     Pfad zur Konfigurationsdatei (Standard: .\config.json)
 
 .PARAMETER OutputPath
-    Pfad für die Ausgabe-Excel-Datei (Standard: .\OneView_Networks_Export_<Datum>.xlsx)
+    Pfad für die Ausgabe-Excel-Datei (Standard: automatisch generiert)
 
 .EXAMPLE
-    .\Export-EthernetNetworks.ps1
+    .\Export-NetworkSets.ps1
     Exportiert mit Standardkonfiguration.
 
 .EXAMPLE
-    .\Export-EthernetNetworks.ps1 -OutputPath "C:\Exports\Networks.xlsx"
+    .\Export-NetworkSets.ps1 -OutputPath "C:\Exports\NetworkSets.xlsx"
     Exportiert in eine benutzerdefinierte Datei.
 
 .NOTES
@@ -46,7 +46,10 @@ param(
     [string]$ConfigPath = (Join-Path $PSScriptRoot "config.json"),
 
     [Parameter()]
-    [string]$OutputPath = ""
+    [string]$OutputPath = "",
+
+    [Parameter()]
+    [string]$LogPath = ""
 )
 
 # ============================================================================
@@ -54,6 +57,7 @@ param(
 # ============================================================================
 $ErrorActionPreference = "Stop"
 $script:LogEntries = [System.Collections.Generic.List[string]]::new()
+$script:LogPath = $LogPath
 
 # ============================================================================
 #  Hilfsfunktionen
@@ -79,10 +83,17 @@ function Write-Log {
 
 function Save-Log {
     param([string]$LogDir = $PSScriptRoot)
-    $logsDir = Join-Path $LogDir "Logs"
-    if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
-    $logFile = Join-Path $logsDir ("VLAN_Export_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
-    $script:LogEntries | Set-Content -Path $logFile -Encoding UTF8
+    if ($script:LogPath) {
+        $logFile = $script:LogPath
+        $parent = Split-Path $logFile -Parent
+        if (-not (Test-Path $parent)) { New-Item -Path $parent -ItemType Directory -Force | Out-Null }
+        $script:LogEntries | Add-Content -Path $logFile -Encoding UTF8
+    } else {
+        $logsDir = Join-Path $LogDir "Logs"
+        if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
+        $logFile = Join-Path $logsDir ("NetworkSet_Export_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
+        $script:LogEntries | Set-Content -Path $logFile -Encoding UTF8
+    }
     Write-Host "`nProtokoll gespeichert: $logFile" -ForegroundColor Cyan
 }
 
@@ -138,7 +149,7 @@ function Connect-OneViewAPI {
         }
     }
     catch {
-        Write-Log "Authentifizierung fehlgeschlagen für ${Hostname}: $_" -Level ERROR
+        Write-Log "Authentifizierung fehlgeschlagen für $Hostname : $_" -Level ERROR
         throw
     }
 }
@@ -159,13 +170,6 @@ function Disconnect-OneViewAPI {
 }
 
 function Get-OneViewApiVersion {
-    <#
-    .SYNOPSIS  Ermittelt die aktuelle API-Version einer OneView Appliance via GET /rest/version
-    .DESCRIPTION
-        Der Endpoint /rest/version erfordert KEINE Authentifizierung und liefert
-        die aktuelle (currentVersion) und minimale (minimumVersion) API-Version.
-        Gibt bei Fehler den übergebenen Fallback-Wert zurück.
-    #>
     param(
         [Parameter(Mandatory)][string]$Hostname,
         [int]$FallbackVersion = 8000
@@ -190,13 +194,6 @@ function Get-OneViewApiVersion {
 # ============================================================================
 
 function Get-AllPaginated {
-    <#
-    .SYNOPSIS
-        Ruft alle Ergebnisse einer paginierten OneView API-Ressource ab.
-    .DESCRIPTION
-        Die OneView API liefert standardmäßig max. 100 Einträge pro Seite.
-        Diese Funktion iteriert über alle Seiten und gibt sämtliche Members zurück.
-    #>
     param(
         [Parameter(Mandatory)][hashtable]$Session,
         [Parameter(Mandatory)][string]$ResourcePath,
@@ -224,41 +221,50 @@ function Get-AllPaginated {
     return $allMembers
 }
 
-function Get-AllEthernetNetworks {
-    param([Parameter(Mandatory)][hashtable]$Session)
-
-    Write-Log "Rufe Ethernet Networks ab (paginiert)..."
-    $members = Get-AllPaginated -Session $Session -ResourcePath "/rest/ethernet-networks"
-    Write-Log "  $($members.Count) Ethernet Networks gefunden." -Level INFO
-    return $members
-}
-
 function Get-AllNetworkSets {
     param([Parameter(Mandatory)][hashtable]$Session)
 
-    Write-Log "Rufe Network Sets ab (paginiert)..."
+    Write-Log "Rufe alle Network Sets ab (paginiert)..."
+
     try {
-        $members = Get-AllPaginated -Session $Session -ResourcePath "/rest/network-sets"
-        Write-Log "  $($members.Count) Network Sets gefunden." -Level INFO
-        return $members
+        $sets = Get-AllPaginated -Session $Session -ResourcePath "/rest/network-sets"
+        Write-Log "  $($sets.Count) Network Sets gefunden." -Level INFO
+        return $sets
     }
     catch {
-        Write-Log "  Network Sets konnten nicht abgerufen werden: $_" -Level WARN
-        return @()
+        Write-Log "Fehler beim Abrufen der Network Sets: $_" -Level ERROR
+        throw
+    }
+}
+
+function Get-AllEthernetNetworks {
+    param([Parameter(Mandatory)][hashtable]$Session)
+
+    Write-Log "Rufe alle Ethernet Networks ab (paginiert)..."
+
+    try {
+        $networks = Get-AllPaginated -Session $Session -ResourcePath "/rest/ethernet-networks"
+        Write-Log "  $($networks.Count) Ethernet Networks gefunden." -Level INFO
+        return $networks
+    }
+    catch {
+        Write-Log "Fehler beim Abrufen der Ethernet Networks: $_" -Level ERROR
+        throw
     }
 }
 
 function Get-AllScopes {
     param([Parameter(Mandatory)][hashtable]$Session)
 
-    Write-Log "Rufe Scopes ab (paginiert)..."
+    Write-Log "Rufe alle Scopes ab (paginiert)..."
+
     try {
-        $members = Get-AllPaginated -Session $Session -ResourcePath "/rest/scopes"
-        Write-Log "  $($members.Count) Scopes gefunden." -Level INFO
-        return $members
+        $scopes = Get-AllPaginated -Session $Session -ResourcePath "/rest/scopes"
+        Write-Log "  $($scopes.Count) Scopes gefunden." -Level INFO
+        return $scopes
     }
     catch {
-        Write-Log "  Scopes konnten nicht abgerufen werden: $_" -Level WARN
+        Write-Log "Fehler beim Abrufen der Scopes: $_" -Level WARN
         return @()
     }
 }
@@ -269,8 +275,8 @@ function Get-ConnectionTemplate {
         [Parameter(Mandatory)][string]$ConnectionTemplateUri
     )
 
-    $uri = "$($Session.BaseUri)$ConnectionTemplateUri"
     try {
+        $uri = "$($Session.BaseUri)$ConnectionTemplateUri"
         $template = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
         return $template
     }
@@ -287,7 +293,7 @@ function Get-ConnectionTemplate {
 function Main {
     Write-Host ""
     Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║   HPE OneView – Ethernet Networks nach Excel exportieren    ║" -ForegroundColor Cyan
+    Write-Host "║   HPE OneView – Network Sets nach Excel exportieren         ║" -ForegroundColor Cyan
     Write-Host "║   Über die RESTful API (ohne HPE OneView PowerShell Modul)  ║" -ForegroundColor Cyan
     Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
     Write-Host ""
@@ -319,7 +325,7 @@ function Main {
     }
 
     # -------------------------------------------
-    # 3. Für jede Appliance: Netzwerke exportieren
+    # 3. Für jede Appliance: Network Sets exportieren
     # -------------------------------------------
     foreach ($appliance in $config.OneViewAppliances) {
         Write-Host ""
@@ -337,36 +343,29 @@ function Main {
                 -ApiVersion $detectedApiVersion
 
             # 3b. Alle Daten abrufen
-            $networks    = Get-AllEthernetNetworks -Session $session
             $networkSets = Get-AllNetworkSets -Session $session
+            $networks    = Get-AllEthernetNetworks -Session $session
             $scopes      = Get-AllScopes -Session $session
 
             # -------------------------------------------
             # Lookup-Tabellen erstellen
             # -------------------------------------------
 
-            # Network-URI → Liste der Network Set Namen
-            $networkToSetsMap = @{}
-            foreach ($ns in $networkSets) {
-                if ($ns.networkUris) {
-                    foreach ($netUri in $ns.networkUris) {
-                        if (-not $networkToSetsMap.ContainsKey($netUri)) {
-                            $networkToSetsMap[$netUri] = [System.Collections.Generic.List[string]]::new()
-                        }
-                        $networkToSetsMap[$netUri].Add($ns.name)
-                    }
-                }
+            # Ethernet Network URI → Name
+            $networkUriToName = @{}
+            foreach ($net in $networks) {
+                $networkUriToName[$net.uri] = $net.name
             }
 
-            # Network-URI → Liste der Scope Namen
-            $networkToScopesMap = @{}
+            # Network Set URI → Liste der Scope Namen
+            $nsToScopesMap = @{}
             foreach ($sc in $scopes) {
                 if ($sc.resourceUris) {
                     foreach ($resUri in $sc.resourceUris) {
-                        if (-not $networkToScopesMap.ContainsKey($resUri)) {
-                            $networkToScopesMap[$resUri] = [System.Collections.Generic.List[string]]::new()
+                        if (-not $nsToScopesMap.ContainsKey($resUri)) {
+                            $nsToScopesMap[$resUri] = [System.Collections.Generic.List[string]]::new()
                         }
-                        $networkToScopesMap[$resUri].Add($sc.name)
+                        $nsToScopesMap[$resUri].Add($sc.name)
                     }
                 }
             }
@@ -374,17 +373,42 @@ function Main {
             # -------------------------------------------
             # 3c. Daten zusammenführen
             # -------------------------------------------
-            Write-Log "Verarbeite $($networks.Count) Ethernet Networks..."
+            Write-Log "Verarbeite $($networkSets.Count) Network Sets..."
 
             $exportData = [System.Collections.Generic.List[PSCustomObject]]::new()
 
-            foreach ($net in $networks) {
+            foreach ($ns in $networkSets) {
+                # Member Networks auflösen (URI → Name)
+                $memberNames = [System.Collections.Generic.List[string]]::new()
+                if ($ns.networkUris) {
+                    foreach ($netUri in $ns.networkUris) {
+                        if ($networkUriToName.ContainsKey($netUri)) {
+                            $memberNames.Add($networkUriToName[$netUri])
+                        }
+                        else {
+                            $memberNames.Add("(unbekannt: $netUri)")
+                        }
+                    }
+                }
+                $networksStr = ($memberNames | Sort-Object) -join "; "
+
+                # Native Network auflösen
+                $nativeNetworkName = ""
+                if (-not [string]::IsNullOrWhiteSpace($ns.nativeNetworkUri)) {
+                    if ($networkUriToName.ContainsKey($ns.nativeNetworkUri)) {
+                        $nativeNetworkName = $networkUriToName[$ns.nativeNetworkUri]
+                    }
+                    else {
+                        $nativeNetworkName = "(unbekannt: $($ns.nativeNetworkUri))"
+                    }
+                }
+
                 # Bandwidth aus Connection Template lesen
                 $bwPreferred = 2.5   # Default
-                $bwMaximum   = 50    # Default
+                $bwMaximum   = 20    # Default
 
-                if ($net.connectionTemplateUri) {
-                    $ct = Get-ConnectionTemplate -Session $session -ConnectionTemplateUri $net.connectionTemplateUri
+                if ($ns.connectionTemplateUri) {
+                    $ct = Get-ConnectionTemplate -Session $session -ConnectionTemplateUri $ns.connectionTemplateUri
                     if ($ct -and $ct.bandwidth) {
                         $bwPreferred = [math]::Round($ct.bandwidth.typicalBandwidth / 1000, 2)
                         $bwMaximum   = [math]::Round($ct.bandwidth.maximumBandwidth / 1000, 2)
@@ -393,36 +417,20 @@ function Main {
 
                 # Scope(s) ermitteln
                 $scopeNames = ""
-                if ($networkToScopesMap.ContainsKey($net.uri)) {
-                    $scopeNames = ($networkToScopesMap[$net.uri] | Sort-Object) -join "; "
+                if ($nsToScopesMap.ContainsKey($ns.uri)) {
+                    $scopeNames = ($nsToScopesMap[$ns.uri] | Sort-Object) -join "; "
                 }
-
-                # Network Set(s) ermitteln
-                $setNames = ""
-                if ($networkToSetsMap.ContainsKey($net.uri)) {
-                    $setNames = ($networkToSetsMap[$net.uri] | Sort-Object) -join "; "
-                }
-
-                # IPv4 / IPv6 Subnet
-                $ipv4Subnet = if ($net.subnetUri) { $net.subnetUri } else { "" }
-                $ipv6Subnet = if ($net.ipv6SubnetUri) { $net.ipv6SubnetUri } else { "" }
 
                 # Description
-                $description = if ($net.description) { $net.description } else { "" }
+                $description = if ($ns.description) { $ns.description } else { "" }
 
                 $exportData.Add([PSCustomObject]@{
-                    NetworkName          = $net.name
-                    VlanId               = $net.vlanId
-                    EthernetNetworkType  = $net.ethernetNetworkType
-                    Purpose              = $net.purpose
-                    SmartLink            = $net.smartLink
-                    PrivateNetwork       = $net.privateNetwork
+                    NetworkSetName       = $ns.name
+                    Networks             = $networksStr
+                    NativeNetwork        = $nativeNetworkName
                     PreferredBandwidthGb = $bwPreferred
                     MaximumBandwidthGb   = $bwMaximum
                     Scope                = $scopeNames
-                    NetworkSet           = $setNames
-                    IPv4SubnetId         = $ipv4Subnet
-                    IPv6SubnetId         = $ipv6Subnet
                     Description          = $description
                 })
             }
@@ -433,21 +441,21 @@ function Main {
             $outFile = $OutputPath
             if ([string]::IsNullOrWhiteSpace($outFile)) {
                 $safeName = $appliance.Name -replace '[\\/:*?"<>|]', '_'
-                $outFile = Join-Path $PSScriptRoot ("OneView_Networks_Export_{0}_{1}.xlsx" -f $safeName, (Get-Date -Format "yyyyMMdd_HHmmss"))
+                $outFile = Join-Path $PSScriptRoot ("OneView_NetworkSets_Export_{0}_{1}.xlsx" -f $safeName, (Get-Date -Format "yyyyMMdd_HHmmss"))
             }
 
             $exportData | Export-Excel -Path $outFile `
-                -WorksheetName "VLANs" `
+                -WorksheetName "NetworkSets" `
                 -AutoSize `
                 -FreezeTopRow `
                 -BoldTopRow
 
-            Write-Log "Export abgeschlossen: $($exportData.Count) Netzwerke" -Level SUCCESS
+            Write-Log "Export abgeschlossen: $($exportData.Count) Network Sets" -Level SUCCESS
             Write-Log "Datei: $outFile" -Level SUCCESS
 
             Write-Host ""
             Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-            Write-Host ("║  Exportiert: {0,-47}║" -f "$($exportData.Count) Ethernet Networks") -ForegroundColor Green
+            Write-Host ("║  Exportiert: {0,-47}║" -f "$($exportData.Count) Network Sets") -ForegroundColor Green
             Write-Host ("║  Appliance:  {0,-47}║" -f $appliance.Name) -ForegroundColor Gray
             Write-Host ("║  Datei:      {0,-47}║" -f (Split-Path $outFile -Leaf)) -ForegroundColor Gray
             Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan

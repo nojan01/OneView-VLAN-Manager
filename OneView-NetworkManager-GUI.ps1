@@ -66,7 +66,7 @@ function Get-AppliancesFromFile {
 #  Hauptformular erstellen
 # ============================================================================
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "HPE OneView – Ethernet Network Manager"
+$form.Text = "HPE OneView – Network Manager"
 $form.Size = New-Object System.Drawing.Size(820, 900)
 $form.StartPosition = "CenterScreen"
 $form.MinimumSize = New-Object System.Drawing.Size(700, 750)
@@ -121,21 +121,22 @@ $appliances = Get-AppliancesFromFile -FilePath $appliancesFile
 $grpActions = New-Object System.Windows.Forms.GroupBox
 $grpActions.Text = "Aktionen"
 $grpActions.Location = New-Object System.Drawing.Point(15, 150)
-$grpActions.Size = New-Object System.Drawing.Size(770, 80)
+$grpActions.Size = New-Object System.Drawing.Size(770, 130)
 $grpActions.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 $form.Controls.Add($grpActions)
 
 # TableLayoutPanel für gleichmässige Button-Verteilung (1x3)
 $tblActions = New-Object System.Windows.Forms.TableLayoutPanel
 $tblActions.Location = New-Object System.Drawing.Point(10, 22)
-$tblActions.Size = New-Object System.Drawing.Size(748, 48)
+$tblActions.Size = New-Object System.Drawing.Size(748, 96)
 $tblActions.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 $tblActions.ColumnCount = 3
-$tblActions.RowCount = 1
+$tblActions.RowCount = 2
 $tblActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
 $tblActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
 $tblActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.34))) | Out-Null
-$tblActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100))) | Out-Null
+$tblActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 50))) | Out-Null
+$tblActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 50))) | Out-Null
 $grpActions.Controls.Add($tblActions)
 
 # Button: Import (Erstellen aus Excel)
@@ -171,13 +172,35 @@ $btnMultiDeploy.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnMultiDeploy.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblActions.Controls.Add($btnMultiDeploy, 2, 0)
 
+# Button: Network Set Import (Erstellen aus Excel)
+$btnNSImport = New-Object System.Windows.Forms.Button
+$btnNSImport.Text = "Network Sets importieren"
+$btnNSImport.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnNSImport.Margin = New-Object System.Windows.Forms.Padding(0, 3, 3, 0)
+$btnNSImport.BackColor = [System.Drawing.Color]::FromArgb(0, 128, 128)
+$btnNSImport.ForeColor = [System.Drawing.Color]::White
+$btnNSImport.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnNSImport.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblActions.Controls.Add($btnNSImport, 0, 1)
+
+# Button: Network Set Backup (Multi-Appliance)
+$btnNSBackup = New-Object System.Windows.Forms.Button
+$btnNSBackup.Text = "NS Backup (Multi)"
+$btnNSBackup.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnNSBackup.Margin = New-Object System.Windows.Forms.Padding(3, 3, 3, 0)
+$btnNSBackup.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 80)
+$btnNSBackup.ForeColor = [System.Drawing.Color]::White
+$btnNSBackup.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnNSBackup.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblActions.Controls.Add($btnNSBackup, 1, 1)
+
 # ============================================================================
 #  Ausgabebereich (Log)
 # ============================================================================
 $grpLog = New-Object System.Windows.Forms.GroupBox
 $grpLog.Text = "Protokoll"
-$grpLog.Location = New-Object System.Drawing.Point(15, 250)
-$grpLog.Size = New-Object System.Drawing.Size(770, 580)
+$grpLog.Location = New-Object System.Drawing.Point(15, 300)
+$grpLog.Size = New-Object System.Drawing.Size(770, 530)
 $grpLog.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 $form.Controls.Add($grpLog)
 
@@ -207,6 +230,54 @@ function Write-GUILog {
     $rtbLog.AppendText("[$timestamp] $Message`n")
     $rtbLog.ScrollToCaret()
     [System.Windows.Forms.Application]::DoEvents()
+}
+
+function Invoke-SubprocessWithLiveOutput {
+    <# Startet pwsh-Subprozess und zeigt Ausgabe zeilenweise live im Protokollfenster. #>
+    param([string]$Command)
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = "pwsh"
+    $psi.Arguments = "-NoProfile -NoLogo -Command $Command"
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+
+    $proc = [System.Diagnostics.Process]::Start($psi)
+
+    # Stderr asynchron lesen (verhindert Deadlock)
+    $stderrTask = $proc.StandardError.ReadToEndAsync()
+
+    # Stdout zeilenweise lesen – GUI bleibt reaktionsfähig
+    while ($null -ne ($line = $proc.StandardOutput.ReadLine())) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $color = [System.Drawing.Color]::FromArgb(200, 200, 200)
+        if ($line -match "\[ERROR\]")   { $color = [System.Drawing.Color]::FromArgb(255, 80, 80) }
+        elseif ($line -match "\[WARN\]")    { $color = [System.Drawing.Color]::FromArgb(255, 200, 60) }
+        elseif ($line -match "\[SUCCESS\]") { $color = [System.Drawing.Color]::FromArgb(80, 220, 80) }
+        $rtbLog.SelectionStart = $rtbLog.TextLength
+        $rtbLog.SelectionColor = $color
+        $rtbLog.AppendText("$line`n")
+        $rtbLog.ScrollToCaret()
+        [System.Windows.Forms.Application]::DoEvents()
+    }
+
+    $proc.WaitForExit()
+
+    # Stderr-Ausgabe anzeigen
+    $stderr = $stderrTask.GetAwaiter().GetResult()
+    if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+        foreach ($errLine in ($stderr -split "`n")) {
+            if ([string]::IsNullOrWhiteSpace($errLine)) { continue }
+            $rtbLog.SelectionStart = $rtbLog.TextLength
+            $rtbLog.SelectionColor = [System.Drawing.Color]::FromArgb(255, 80, 80)
+            $rtbLog.AppendText("$errLine`n")
+            $rtbLog.ScrollToCaret()
+        }
+    }
+
+    return $proc.ExitCode
 }
 
 function Show-ApplianceSelectionDialog {
@@ -781,6 +852,58 @@ function New-TempConfig {
     return $tempConfig
 }
 
+function New-TempConfigNS {
+    <#
+    .SYNOPSIS
+        Erstellt eine temporäre config.json für Network Set Operationen.
+    #>
+    param(
+        [string]$Hostname,
+        [string]$ExcelPath,
+        [string]$TempDir
+    )
+
+    $configObj = @{
+        OneViewAppliances = @(
+            @{
+                Name        = $Hostname
+                Hostname    = $Hostname
+                Description = "Ausgewählt über GUI"
+            }
+        )
+        ApiVersion                = 8000
+        NetworkSetExcelFilePath   = $ExcelPath
+        NetworkSetExcelSheetName  = "NetworkSets"
+        NetworkSetDefaultSettings = @{
+            PreferredBandwidthGb = 2.5
+            MaximumBandwidthGb   = 20
+        }
+    }
+
+    # Originale config.json lesen falls vorhanden
+    $origConfig = Join-Path $scriptDir "config.json"
+    if (Test-Path $origConfig) {
+        try {
+            $orig = Get-Content -Path $origConfig -Raw | ConvertFrom-Json
+            $configObj.ApiVersion = $orig.ApiVersion
+            if ($orig.NetworkSetExcelSheetName) {
+                $configObj.NetworkSetExcelSheetName = $orig.NetworkSetExcelSheetName
+            }
+            if ($orig.NetworkSetDefaultSettings) {
+                $configObj.NetworkSetDefaultSettings = @{
+                    PreferredBandwidthGb = $orig.NetworkSetDefaultSettings.PreferredBandwidthGb
+                    MaximumBandwidthGb   = $orig.NetworkSetDefaultSettings.MaximumBandwidthGb
+                }
+            }
+        }
+        catch { }
+    }
+
+    $tempConfig = Join-Path $TempDir "config_ns_temp.json"
+    $configObj | ConvertTo-Json -Depth 5 | Set-Content -Path $tempConfig -Encoding UTF8
+    return $tempConfig
+}
+
 # ============================================================================
 #  Button-Events
 # ============================================================================
@@ -821,6 +944,8 @@ $btnImport.Add_Click({
 
     $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
     $btnImport.Enabled = $false
+    $btnNSImport.Enabled = $false
+    $btnNSBackup.Enabled = $false
     $rtbLog.Clear()
 
     try {
@@ -846,31 +971,7 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
 function Read-Host { param([string]`$Prompt) return 'J' }
 & '$importScript' -ConfigPath '$tempConfig'
 "@
-        $psi = New-Object System.Diagnostics.ProcessStartInfo
-        $psi.FileName = "pwsh"
-        $psi.Arguments = "-NoProfile -NoLogo -Command $psCommand"
-        $psi.UseShellExecute = $false
-        $psi.RedirectStandardOutput = $true
-        $psi.RedirectStandardError = $true
-        $psi.CreateNoWindow = $true
-        $proc = [System.Diagnostics.Process]::Start($psi)
-        $stdout = $proc.StandardOutput.ReadToEnd()
-        $stderr = $proc.StandardError.ReadToEnd()
-        $proc.WaitForExit()
-        $output = ($stdout + $stderr) -split "`n" | Where-Object { $_.Trim() -ne "" }
-
-        foreach ($line in $output) {
-            $lineStr = $line.ToString()
-            $color = [System.Drawing.Color]::FromArgb(200, 200, 200)
-            if ($lineStr -match "\[ERROR\]")   { $color = [System.Drawing.Color]::FromArgb(255, 80, 80) }
-            elseif ($lineStr -match "\[WARN\]")    { $color = [System.Drawing.Color]::FromArgb(255, 200, 60) }
-            elseif ($lineStr -match "\[SUCCESS\]") { $color = [System.Drawing.Color]::FromArgb(80, 220, 80) }
-
-            $rtbLog.SelectionStart = $rtbLog.TextLength
-            $rtbLog.SelectionColor = $color
-            $rtbLog.AppendText("$lineStr`n")
-            $rtbLog.ScrollToCaret()
-        }
+        Invoke-SubprocessWithLiveOutput -Command $psCommand | Out-Null
 
         Write-GUILog "Import abgeschlossen." -Color ([System.Drawing.Color]::Cyan)
 
@@ -885,6 +986,8 @@ function Read-Host { param([string]`$Prompt) return 'J' }
         $env:OV_PASSWORD = $null
         $form.Cursor = [System.Windows.Forms.Cursors]::Default
         $btnImport.Enabled = $true
+        $btnNSImport.Enabled = $true
+        $btnNSBackup.Enabled = $true
     }
 })
 
@@ -928,12 +1031,18 @@ $btnBackup.Add_Click({
     $btnImport.Enabled = $false
     $btnBackup.Enabled = $false
     $btnMultiDeploy.Enabled = $false
+    $btnNSImport.Enabled = $false
+    $btnNSBackup.Enabled = $false
     $rtbLog.Clear()
 
     try {
         $backupDir = Join-Path $scriptDir "Backups" (Get-Date -Format "yyyyMMdd_HHmmss")
         New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
         Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+
+        $logsDir = Join-Path $scriptDir "Logs"
+        if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
+        $sharedLogPath = Join-Path $logsDir ("VLAN_Export_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
 
         $successCount = 0
         $errorCount = 0
@@ -954,34 +1063,11 @@ $btnBackup.Add_Click({
 `$secPass = ConvertTo-SecureString `$env:OV_PASSWORD -AsPlainText -Force
 `$global:guiCredential = New-Object System.Management.Automation.PSCredential(`$env:OV_USERNAME, `$secPass)
 function Get-Credential { param([string]`$Message) return `$global:guiCredential }
-& '$exportScript' -ConfigPath '$tempConfig' -OutputPath '$exportPath'
+& '$exportScript' -ConfigPath '$tempConfig' -OutputPath '$exportPath' -LogPath '$sharedLogPath'
 "@
-                $psi = New-Object System.Diagnostics.ProcessStartInfo
-                $psi.FileName = "pwsh"
-                $psi.Arguments = "-NoProfile -NoLogo -Command $psCommand"
-                $psi.UseShellExecute = $false
-                $psi.RedirectStandardOutput = $true
-                $psi.RedirectStandardError = $true
-                $psi.CreateNoWindow = $true
-                $proc = [System.Diagnostics.Process]::Start($psi)
-                $stdout = $proc.StandardOutput.ReadToEnd()
-                $stderr = $proc.StandardError.ReadToEnd()
-                $proc.WaitForExit()
-                $output = ($stdout + $stderr) -split "`n" | Where-Object { $_.Trim() -ne "" }
+                $exitCode = Invoke-SubprocessWithLiveOutput -Command $psCommand
 
-                foreach ($line in $output) {
-                    $lineStr = $line.ToString()
-                    $color = [System.Drawing.Color]::FromArgb(200, 200, 200)
-                    if ($lineStr -match "\[ERROR\]")   { $color = [System.Drawing.Color]::FromArgb(255, 80, 80) }
-                    elseif ($lineStr -match "\[WARN\]")    { $color = [System.Drawing.Color]::FromArgb(255, 200, 60) }
-                    elseif ($lineStr -match "\[SUCCESS\]") { $color = [System.Drawing.Color]::FromArgb(80, 220, 80) }
-                    $rtbLog.SelectionStart = $rtbLog.TextLength
-                    $rtbLog.SelectionColor = $color
-                    $rtbLog.AppendText("$lineStr`n")
-                    $rtbLog.ScrollToCaret()
-                }
-
-                if ($proc.ExitCode -eq 0 -and (Test-Path $exportPath)) {
+                if ($exitCode -eq 0 -and (Test-Path $exportPath)) {
                     Write-GUILog "Backup erfolgreich: $applianceHost" -Color ([System.Drawing.Color]::FromArgb(80, 220, 80))
                     $successCount++
                 } else {
@@ -1019,6 +1105,8 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
         $btnImport.Enabled = $true
         $btnBackup.Enabled = $true
         $btnMultiDeploy.Enabled = $true
+        $btnNSImport.Enabled = $true
+        $btnNSBackup.Enabled = $true
     }
 })
 
@@ -1143,6 +1231,8 @@ $btnMultiDeploy.Add_Click({
     $btnImport.Enabled = $false
     $btnBackup.Enabled = $false
     $btnMultiDeploy.Enabled = $false
+    $btnNSImport.Enabled = $false
+    $btnNSBackup.Enabled = $false
     $rtbLog.Clear()
 
     $tempExcelFiles = @()
@@ -1156,6 +1246,10 @@ $btnMultiDeploy.Add_Click({
         Write-GUILog "Netzwerk: $($netParams.NetworkName) (VLAN $($netParams.VlanId))" -Color ([System.Drawing.Color]::Cyan)
         Write-GUILog "Ziel-Appliances: $($selectedAppliances.Count)" -Color ([System.Drawing.Color]::Cyan)
         Write-GUILog "" -Color ([System.Drawing.Color]::Cyan)
+
+        $logsDir = Join-Path $scriptDir "Logs"
+        if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
+        $sharedLogPath = Join-Path $logsDir ("VLAN_MultiDeploy_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
 
         $successCount = 0
         $errorCount = 0
@@ -1199,34 +1293,11 @@ $btnMultiDeploy.Add_Click({
 `$global:guiCredential = New-Object System.Management.Automation.PSCredential(`$env:OV_USERNAME, `$secPass)
 function Get-Credential { param([string]`$Message) return `$global:guiCredential }
 function Read-Host { param([string]`$Prompt) return 'J' }
-& '$importScript' -ConfigPath '$tempConfig'
+& '$importScript' -ConfigPath '$tempConfig' -LogPath '$sharedLogPath'
 "@
-                $psi = New-Object System.Diagnostics.ProcessStartInfo
-                $psi.FileName = "pwsh"
-                $psi.Arguments = "-NoProfile -NoLogo -Command $psCommand"
-                $psi.UseShellExecute = $false
-                $psi.RedirectStandardOutput = $true
-                $psi.RedirectStandardError = $true
-                $psi.CreateNoWindow = $true
-                $proc = [System.Diagnostics.Process]::Start($psi)
-                $stdout = $proc.StandardOutput.ReadToEnd()
-                $stderr = $proc.StandardError.ReadToEnd()
-                $proc.WaitForExit()
-                $output = ($stdout + $stderr) -split "`n" | Where-Object { $_.Trim() -ne "" }
+                $exitCode = Invoke-SubprocessWithLiveOutput -Command $psCommand
 
-                foreach ($line in $output) {
-                    $lineStr = $line.ToString()
-                    $color = [System.Drawing.Color]::FromArgb(200, 200, 200)
-                    if ($lineStr -match "\[ERROR\]")   { $color = [System.Drawing.Color]::FromArgb(255, 80, 80) }
-                    elseif ($lineStr -match "\[WARN\]")    { $color = [System.Drawing.Color]::FromArgb(255, 200, 60) }
-                    elseif ($lineStr -match "\[SUCCESS\]") { $color = [System.Drawing.Color]::FromArgb(80, 220, 80) }
-                    $rtbLog.SelectionStart = $rtbLog.TextLength
-                    $rtbLog.SelectionColor = $color
-                    $rtbLog.AppendText("$lineStr`n")
-                    $rtbLog.ScrollToCaret()
-                }
-
-                if ($proc.ExitCode -eq 0) {
+                if ($exitCode -eq 0) {
                     Write-GUILog "Erfolgreich auf $applianceHost" -Color ([System.Drawing.Color]::FromArgb(80, 220, 80))
                     $successCount++
                 } else {
@@ -1266,6 +1337,198 @@ function Read-Host { param([string]`$Prompt) return 'J' }
         $btnImport.Enabled = $true
         $btnBackup.Enabled = $true
         $btnMultiDeploy.Enabled = $true
+        $btnNSImport.Enabled = $true
+        $btnNSBackup.Enabled = $true
+    }
+})
+
+# ============================================================================
+#  Button-Event: Network Sets importieren (Einzelne Appliance)
+# ============================================================================
+$btnNSImport.Add_Click({
+    if (-not (Test-InputValid)) { return }
+
+    if (-not $appliances -or $appliances.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Keine Appliances in der Appliances.txt gefunden.",
+            "Keine Appliances",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $hostname = Show-SingleApplianceSelectionDialog -Appliances $appliances -Title "NS Import – Appliance auswählen"
+    if (-not $hostname) { return }
+
+    # Excel-Datei auswählen
+    $ofd = New-Object System.Windows.Forms.OpenFileDialog
+    $ofd.Filter = "Excel-Dateien (*.xlsx)|*.xlsx|Alle Dateien (*.*)|*.*"
+    $ofd.InitialDirectory = $scriptDir
+    $ofd.Title = "Excel-Datei mit Network Sets auswählen"
+    if ($ofd.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+    $excelPath = $ofd.FileName
+
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        "Network Sets aus der Excel-Datei auf`n$hostname`nerstellen/aktualisieren?`n`nDatei: $excelPath",
+        "NS Import bestätigen",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+
+    $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+    $btnNSImport.Enabled = $false
+    $rtbLog.Clear()
+
+    try {
+        Write-GUILog "Starte Network Set Import auf $hostname ..." -Color ([System.Drawing.Color]::Cyan)
+
+        $tempConfig = New-TempConfigNS -Hostname $hostname `
+            -ExcelPath $excelPath `
+            -TempDir $scriptDir
+
+        $importScript = Join-Path $scriptDir "Create-NetworkSets.ps1"
+        $psCommand = @"
+`$env:OV_USERNAME = '$($txtUser.Text)'
+`$env:OV_PASSWORD = '$($txtPass.Text -replace "'", "''")'
+`$secPass = ConvertTo-SecureString `$env:OV_PASSWORD -AsPlainText -Force
+`$global:guiCredential = New-Object System.Management.Automation.PSCredential(`$env:OV_USERNAME, `$secPass)
+function Get-Credential { param([string]`$Message) return `$global:guiCredential }
+function Read-Host { param([string]`$Prompt) return 'J' }
+& '$importScript' -ConfigPath '$tempConfig'
+"@
+        Invoke-SubprocessWithLiveOutput -Command $psCommand | Out-Null
+
+        Write-GUILog "Network Set Import abgeschlossen." -Color ([System.Drawing.Color]::Cyan)
+
+        Remove-Item -Path $tempConfig -Force -ErrorAction SilentlyContinue
+    }
+    catch {
+        Write-GUILog "Fehler: $_" -Color ([System.Drawing.Color]::Red)
+    }
+    finally {
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+        $btnNSImport.Enabled = $true
+    }
+})
+
+# ============================================================================
+#  Button-Event: Network Set Backup (Multi-Appliance)
+# ============================================================================
+$btnNSBackup.Add_Click({
+    if ([string]::IsNullOrWhiteSpace($txtUser.Text) -or [string]::IsNullOrWhiteSpace($txtPass.Text)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Bitte Benutzername und Kennwort eingeben.",
+            "Fehlende Anmeldeinformationen",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    if (-not $appliances -or $appliances.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Keine Appliances in der Appliances.txt gefunden.",
+            "Keine Appliances",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $selectedAppliances = Show-ApplianceSelectionDialog -Appliances $appliances -Title "NS Backup – Appliances auswählen"
+    if (-not $selectedAppliances -or $selectedAppliances.Count -eq 0) { return }
+
+    $applianceList = $selectedAppliances -join "`n"
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        "Network Set Backup von $($selectedAppliances.Count) Appliance(s) erstellen?`n`n$applianceList",
+        "NS Backup bestätigen",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+
+    $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+    $btnImport.Enabled = $false
+    $btnBackup.Enabled = $false
+    $btnMultiDeploy.Enabled = $false
+    $btnNSImport.Enabled = $false
+    $btnNSBackup.Enabled = $false
+    $rtbLog.Clear()
+
+    try {
+        $backupDir = Join-Path $scriptDir "Backups" (Get-Date -Format "yyyyMMdd_HHmmss")
+        New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
+        Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+
+        $logsDir = Join-Path $scriptDir "Logs"
+        if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
+        $sharedLogPath = Join-Path $logsDir ("NetworkSet_Export_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
+
+        $successCount = 0
+        $errorCount = 0
+
+        foreach ($applianceHost in $selectedAppliances) {
+            Write-GUILog "Starte NS Backup von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
+
+            $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
+            $exportPath = Join-Path $backupDir ("NetworkSets_${safeName}.xlsx")
+
+            $tempConfig = New-TempConfigNS -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
+
+            try {
+                $exportScript = Join-Path $scriptDir "Export-NetworkSets.ps1"
+                $psCommand = @"
+`$env:OV_USERNAME = '$($txtUser.Text)'
+`$env:OV_PASSWORD = '$($txtPass.Text -replace "'", "''")'
+`$secPass = ConvertTo-SecureString `$env:OV_PASSWORD -AsPlainText -Force
+`$global:guiCredential = New-Object System.Management.Automation.PSCredential(`$env:OV_USERNAME, `$secPass)
+function Get-Credential { param([string]`$Message) return `$global:guiCredential }
+& '$exportScript' -ConfigPath '$tempConfig' -OutputPath '$exportPath' -LogPath '$sharedLogPath'
+"@
+                $exitCode = Invoke-SubprocessWithLiveOutput -Command $psCommand
+
+                if ($exitCode -eq 0 -and (Test-Path $exportPath)) {
+                    Write-GUILog "NS Backup erfolgreich: $applianceHost" -Color ([System.Drawing.Color]::FromArgb(80, 220, 80))
+                    $successCount++
+                } else {
+                    Write-GUILog "NS Backup fehlgeschlagen: $applianceHost" -Color ([System.Drawing.Color]::FromArgb(255, 80, 80))
+                    $errorCount++
+                }
+            }
+            catch {
+                Write-GUILog "Fehler bei $applianceHost : $_" -Color ([System.Drawing.Color]::Red)
+                $errorCount++
+            }
+            finally {
+                Remove-Item -Path $tempConfig -Force -ErrorAction SilentlyContinue
+            }
+
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+
+        Write-GUILog "" -Color ([System.Drawing.Color]::Cyan)
+        Write-GUILog "NS Backup abgeschlossen: $successCount erfolgreich, $errorCount fehlgeschlagen" -Color ([System.Drawing.Color]::Cyan)
+        Write-GUILog "Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+
+        [System.Windows.Forms.MessageBox]::Show(
+            "Network Set Backup abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupDir",
+            "NS Backup Ergebnis",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        ) | Out-Null
+    }
+    catch {
+        Write-GUILog "Fehler: $_" -Color ([System.Drawing.Color]::Red)
+    }
+    finally {
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+        $btnImport.Enabled = $true
+        $btnBackup.Enabled = $true
+        $btnMultiDeploy.Enabled = $true
+        $btnNSImport.Enabled = $true
+        $btnNSBackup.Enabled = $true
     }
 })
 

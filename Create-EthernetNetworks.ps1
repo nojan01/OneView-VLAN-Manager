@@ -50,7 +50,10 @@
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter()]
-    [string]$ConfigPath = (Join-Path $PSScriptRoot "config.json")
+    [string]$ConfigPath = (Join-Path $PSScriptRoot "config.json"),
+
+    [Parameter()]
+    [string]$LogPath = ""
 )
 
 # ============================================================================
@@ -58,6 +61,7 @@ param(
 # ============================================================================
 $ErrorActionPreference = "Stop"
 $script:LogEntries = [System.Collections.Generic.List[string]]::new()
+$script:LogPath = $LogPath
 $script:CreatedNetworks = 0
 $script:UpdatedNetworks = 0
 $script:SkippedNetworks = 0
@@ -91,10 +95,17 @@ function Write-Log {
 
 function Save-Log {
     param([string]$LogDir = $PSScriptRoot)
-    $logsDir = Join-Path $LogDir "Logs"
-    if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
-    $logFile = Join-Path $logsDir ("VLAN_Import_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
-    $script:LogEntries | Set-Content -Path $logFile -Encoding UTF8
+    if ($script:LogPath) {
+        $logFile = $script:LogPath
+        $parent = Split-Path $logFile -Parent
+        if (-not (Test-Path $parent)) { New-Item -Path $parent -ItemType Directory -Force | Out-Null }
+        $script:LogEntries | Add-Content -Path $logFile -Encoding UTF8
+    } else {
+        $logsDir = Join-Path $LogDir "Logs"
+        if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
+        $logFile = Join-Path $logsDir ("VLAN_Import_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
+        $script:LogEntries | Set-Content -Path $logFile -Encoding UTF8
+    }
     Write-Host "`nProtokoll gespeichert: $logFile" -ForegroundColor Cyan
 }
 

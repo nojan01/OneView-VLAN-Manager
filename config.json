@@ -16,5 +16,11 @@
         "EthernetNetworkType": "Tagged",
         "PreferredBandwidthGb": 2.5,
         "MaximumBandwidthGb": 50
+    },
+    "NetworkSetExcelFilePath": ".\\NetworkSets.xlsx",
+    "NetworkSetExcelSheetName": "NetworkSets",
+    "NetworkSetDefaultSettings": {
+        "PreferredBandwidthGb": 2.5,
+        "MaximumBandwidthGb": 20
     }
 }
