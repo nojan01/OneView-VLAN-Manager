@@ -299,7 +299,7 @@ function Show-ApplianceSelectionDialog {
 
     $dlg = New-Object System.Windows.Forms.Form
     $dlg.Text = $Title
-    $dlg.Size = New-Object System.Drawing.Size(550, 450)
+    $dlg.Size = New-Object System.Drawing.Size(550, 490)
     $dlg.StartPosition = "CenterParent"
     $dlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $dlg.MaximizeBox = $false
@@ -340,9 +340,28 @@ function Show-ApplianceSelectionDialog {
     })
     $dlg.Controls.Add($btnNone)
 
+    # Typ-Filter-Buttons dynamisch erzeugen (z.B. "Alle ESXi", "Alle VDI")
+    $types = @($Appliances | Where-Object { $_.Type } | ForEach-Object { $_.Type } | Select-Object -Unique | Sort-Object)
+    $typeButtonX = 275
+    foreach ($typeName in $types) {
+        $btnType = New-Object System.Windows.Forms.Button
+        $btnType.Text = "Alle $typeName"
+        $btnType.Location = New-Object System.Drawing.Point($typeButtonX, 340)
+        $btnType.Size = New-Object System.Drawing.Size(85, 28)
+        $btnType.Tag = $typeName
+        $btnType.Add_Click({
+            $filterType = $this.Tag
+            for ($i = 0; $i -lt $clb.Items.Count; $i++) {
+                $clb.SetItemChecked($i, ($Appliances[$i].Type -eq $filterType))
+            }
+        })
+        $dlg.Controls.Add($btnType)
+        $typeButtonX += 95
+    }
+
     $btnOK = New-Object System.Windows.Forms.Button
     $btnOK.Text = "OK"
-    $btnOK.Location = New-Object System.Drawing.Point(370, 340)
+    $btnOK.Location = New-Object System.Drawing.Point(370, 380)
     $btnOK.Size = New-Object System.Drawing.Size(55, 28)
     $btnOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
     $dlg.AcceptButton = $btnOK
@@ -350,7 +369,7 @@ function Show-ApplianceSelectionDialog {
 
     $btnCancel = New-Object System.Windows.Forms.Button
     $btnCancel.Text = "Abbrechen"
-    $btnCancel.Location = New-Object System.Drawing.Point(430, 340)
+    $btnCancel.Location = New-Object System.Drawing.Point(430, 380)
     $btnCancel.Size = New-Object System.Drawing.Size(90, 28)
     $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
     $dlg.CancelButton = $btnCancel
