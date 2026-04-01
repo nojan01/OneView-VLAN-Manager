@@ -175,18 +175,15 @@ $authHeaders = @{
 try {
     Write-Log "Lade Server Profile Templates..."
     $allTemplates = [System.Collections.Generic.List[object]]::new()
-    $start    = 0
-    $pageSize = 100
+    $uri = "$baseUri/rest/server-profile-templates?start=0&count=100"
 
     do {
-        $uri = "$baseUri/rest/server-profile-templates?start=$start&count=$pageSize"
         $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $authHeaders -SkipCertificateCheck
         if ($response.members) {
             $allTemplates.AddRange([object[]]$response.members)
         }
-        $total = $response.total
-        $start += $response.members.Count
-    } while ($allTemplates.Count -lt $total)
+        $uri = if ($response.nextPageUri) { "$baseUri$($response.nextPageUri)" } else { $null }
+    } while ($uri)
 
     Write-Log "$($allTemplates.Count) Server Profile Template(s) gefunden" "SUCCESS"
 } catch {

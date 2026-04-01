@@ -807,18 +807,15 @@ function Get-NetworkSetsInline {
     param([Parameter(Mandatory)][hashtable]$Session)
 
     $allMembers = [System.Collections.Generic.List[object]]::new()
-    $start = 0
-    $pageSize = 200
+    $uri = "$($Session.BaseUri)/rest/network-sets?start=0&count=200"
 
     do {
-        $uri = "$($Session.BaseUri)/rest/network-sets?start=$start&count=$pageSize"
         $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
         if ($response.members) {
             $allMembers.AddRange([object[]]$response.members)
         }
-        $total = $response.total
-        $start += $response.members.Count
-    } while ($allMembers.Count -lt $total)
+        $uri = if ($response.nextPageUri) { "$($Session.BaseUri)$($response.nextPageUri)" } else { $null }
+    } while ($uri)
 
     return $allMembers
 }
@@ -849,42 +846,36 @@ function Get-ApiVersionInline {
 function Get-ServerProfilesInline {
     param([Parameter(Mandatory)][hashtable]$Session)
     $allMembers = [System.Collections.Generic.List[object]]::new()
-    $start = 0; $pageSize = 100
+    $uri = "$($Session.BaseUri)/rest/server-profiles?start=0&count=100"
     do {
-        $uri = "$($Session.BaseUri)/rest/server-profiles?start=$start&count=$pageSize"
         $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
         if ($response.members) { $allMembers.AddRange([object[]]$response.members) }
-        $total = $response.total
-        $start += $response.members.Count
-    } while ($allMembers.Count -lt $total)
+        $uri = if ($response.nextPageUri) { "$($Session.BaseUri)$($response.nextPageUri)" } else { $null }
+    } while ($uri)
     return $allMembers
 }
 
 function Get-ServerProfileTemplatesInline {
     param([Parameter(Mandatory)][hashtable]$Session)
     $allMembers = [System.Collections.Generic.List[object]]::new()
-    $start = 0; $pageSize = 100
+    $uri = "$($Session.BaseUri)/rest/server-profile-templates?start=0&count=100"
     do {
-        $uri = "$($Session.BaseUri)/rest/server-profile-templates?start=$start&count=$pageSize"
         $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
         if ($response.members) { $allMembers.AddRange([object[]]$response.members) }
-        $total = $response.total
-        $start += $response.members.Count
-    } while ($allMembers.Count -lt $total)
+        $uri = if ($response.nextPageUri) { "$($Session.BaseUri)$($response.nextPageUri)" } else { $null }
+    } while ($uri)
     return $allMembers
 }
 
 function Get-ServerHardwareInline {
     param([Parameter(Mandatory)][hashtable]$Session)
     $allMembers = [System.Collections.Generic.List[object]]::new()
-    $start = 0; $pageSize = 100
+    $uri = "$($Session.BaseUri)/rest/server-hardware?start=0&count=100"
     do {
-        $uri = "$($Session.BaseUri)/rest/server-hardware?start=$start&count=$pageSize"
         $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
         if ($response.members) { $allMembers.AddRange([object[]]$response.members) }
-        $total = $response.total
-        $start += $response.members.Count
-    } while ($allMembers.Count -lt $total)
+        $uri = if ($response.nextPageUri) { "$($Session.BaseUri)$($response.nextPageUri)" } else { $null }
+    } while ($uri)
     return $allMembers
 }
 
@@ -2206,16 +2197,14 @@ function Show-ServerProfileTemplateManageDialog {
             # Server Hardware Types laden für Anzeige
             $script:sptHWTypeMap = @{}
             try {
-                $start = 0; $pageSize = 100
+                $uri = "$($Session.BaseUri)/rest/server-hardware-types?start=0&count=100"
                 do {
-                    $uri = "$($Session.BaseUri)/rest/server-hardware-types?start=$start&count=$pageSize"
                     $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
                     if ($response.members) {
                         foreach ($hwt in $response.members) { $script:sptHWTypeMap[$hwt.uri] = $hwt.name }
                     }
-                    $total = $response.total
-                    $start += $response.members.Count
-                } while ($script:sptHWTypeMap.Count -lt $total)
+                    $uri = if ($response.nextPageUri) { "$($Session.BaseUri)$($response.nextPageUri)" } else { $null }
+                } while ($uri)
             } catch { }
 
             # Enclosure Groups laden für Anzeige
@@ -2225,6 +2214,12 @@ function Show-ServerProfileTemplateManageDialog {
                 $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
                 if ($response.members) {
                     foreach ($eg in $response.members) { $script:sptEncGroupMap[$eg.uri] = $eg.name }
+                }
+                while ($response.nextPageUri) {
+                    $response = Invoke-RestMethod -Uri "$($Session.BaseUri)$($response.nextPageUri)" -Method Get -Headers $Session.Headers -SkipCertificateCheck
+                    if ($response.members) {
+                        foreach ($eg in $response.members) { $script:sptEncGroupMap[$eg.uri] = $eg.name }
+                    }
                 }
             } catch { }
 

@@ -201,22 +201,19 @@ function Get-AllPaginated {
     )
 
     $allMembers = [System.Collections.Generic.List[object]]::new()
-    $start = 0
+    $uri = "$($Session.BaseUri)$ResourcePath" + "?start=0&count=$PageSize"
 
     do {
-        $uri = "$($Session.BaseUri)$ResourcePath" + "?start=$start&count=$PageSize"
         $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
 
         if ($response.members) {
             $allMembers.AddRange([object[]]$response.members)
         }
 
-        $total = $response.total
-        $start += $response.members.Count
+        Write-Log "  Seite abgerufen: $($allMembers.Count) / $($response.total) Einträge" -Level INFO
 
-        Write-Log "  Seite abgerufen: $($allMembers.Count) / $total Einträge" -Level INFO
-
-    } while ($allMembers.Count -lt $total)
+        $uri = if ($response.nextPageUri) { "$($Session.BaseUri)$($response.nextPageUri)" } else { $null }
+    } while ($uri)
 
     return $allMembers
 }

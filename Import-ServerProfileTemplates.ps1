@@ -227,17 +227,14 @@ $existingTemplates = @{}
 if ($Mode -ne "Create") {
     try {
         Write-Log "Lade existierende Server Profile Templates..."
-        $start    = 0
-        $pageSize = 100
+        $uri = "$baseUri/rest/server-profile-templates?start=0&count=100"
         do {
-            $uri = "$baseUri/rest/server-profile-templates?start=$start&count=$pageSize"
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $authHeaders -SkipCertificateCheck
             foreach ($member in $response.members) {
                 $existingTemplates[$member.name] = $member
             }
-            $total = $response.total
-            $start += $response.members.Count
-        } while ($existingTemplates.Count -lt $total)
+            $uri = if ($response.nextPageUri) { "$baseUri$($response.nextPageUri)" } else { $null }
+        } while ($uri)
         Write-Log "$($existingTemplates.Count) existierende Templates gefunden"
     } catch {
         Write-Log "Fehler beim Laden existierender Templates: $_" "ERROR"

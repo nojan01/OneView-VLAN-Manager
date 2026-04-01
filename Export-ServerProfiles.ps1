@@ -175,18 +175,15 @@ $authHeaders = @{
 try {
     Write-Log "Lade Server Profiles..."
     $allProfiles = [System.Collections.Generic.List[object]]::new()
-    $start    = 0
-    $pageSize = 100
+    $uri = "$baseUri/rest/server-profiles?start=0&count=100"
 
     do {
-        $uri = "$baseUri/rest/server-profiles?start=$start&count=$pageSize"
         $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $authHeaders -SkipCertificateCheck
         if ($response.members) {
             $allProfiles.AddRange([object[]]$response.members)
         }
-        $total = $response.total
-        $start += $response.members.Count
-    } while ($allProfiles.Count -lt $total)
+        $uri = if ($response.nextPageUri) { "$baseUri$($response.nextPageUri)" } else { $null }
+    } while ($uri)
 
     Write-Log "$($allProfiles.Count) Server Profile(s) gefunden" "SUCCESS"
 } catch {

@@ -227,17 +227,14 @@ $existingProfiles = @{}
 if ($Mode -ne "Create") {
     try {
         Write-Log "Lade existierende Server Profiles..."
-        $start    = 0
-        $pageSize = 100
+        $uri = "$baseUri/rest/server-profiles?start=0&count=100"
         do {
-            $uri = "$baseUri/rest/server-profiles?start=$start&count=$pageSize"
             $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $authHeaders -SkipCertificateCheck
             foreach ($member in $response.members) {
                 $existingProfiles[$member.name] = $member
             }
-            $total = $response.total
-            $start += $response.members.Count
-        } while ($existingProfiles.Count -lt $total)
+            $uri = if ($response.nextPageUri) { "$baseUri$($response.nextPageUri)" } else { $null }
+        } while ($uri)
         Write-Log "$($existingProfiles.Count) existierende Profile gefunden"
     } catch {
         Write-Log "Fehler beim Laden existierender Profile: $_" "ERROR"
