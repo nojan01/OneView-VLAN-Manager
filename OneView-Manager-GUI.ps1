@@ -75,7 +75,7 @@ function Get-AppliancesFromFile {
 # ============================================================================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "HPE OneView Manager"
-$form.Size = New-Object System.Drawing.Size(820, 990)
+$form.Size = New-Object System.Drawing.Size(820, 1080)
 $form.StartPosition = "CenterScreen"
 $form.MinimumSize = New-Object System.Drawing.Size(700, 850)
 $form.MaximizeBox = $true
@@ -270,11 +270,78 @@ $btnSPJsonEdit.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Dra
 $tblSP.Controls.Add($btnSPJsonEdit, 3, 0)
 
 # ============================================================================
+#  GroupBox: Server Profile Templates
+# ============================================================================
+$grpSPT = New-Object System.Windows.Forms.GroupBox
+$grpSPT.Text = "Server Profile Templates"
+$grpSPT.Location = New-Object System.Drawing.Point(15, 385)
+$grpSPT.Size = New-Object System.Drawing.Size(770, 80)
+$grpSPT.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+$form.Controls.Add($grpSPT)
+
+$tblSPT = New-Object System.Windows.Forms.TableLayoutPanel
+$tblSPT.Location = New-Object System.Drawing.Point(10, 22)
+$tblSPT.Size = New-Object System.Drawing.Size(748, 46)
+$tblSPT.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
+$tblSPT.ColumnCount = 4
+$tblSPT.RowCount = 1
+$tblSPT.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25))) | Out-Null
+$tblSPT.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25))) | Out-Null
+$tblSPT.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25))) | Out-Null
+$tblSPT.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25))) | Out-Null
+$tblSPT.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100))) | Out-Null
+$grpSPT.Controls.Add($tblSPT)
+
+# Button: SPT exportieren
+$btnSPTExport = New-Object System.Windows.Forms.Button
+$btnSPTExport.Text = "SPT exportieren (JSON)"
+$btnSPTExport.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnSPTExport.Margin = New-Object System.Windows.Forms.Padding(0, 0, 3, 0)
+$btnSPTExport.BackColor = [System.Drawing.Color]::FromArgb(60, 60, 160)
+$btnSPTExport.ForeColor = [System.Drawing.Color]::White
+$btnSPTExport.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnSPTExport.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblSPT.Controls.Add($btnSPTExport, 0, 0)
+
+# Button: SPT importieren
+$btnSPTImport = New-Object System.Windows.Forms.Button
+$btnSPTImport.Text = "SPT importieren (JSON)"
+$btnSPTImport.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnSPTImport.Margin = New-Object System.Windows.Forms.Padding(3, 0, 3, 0)
+$btnSPTImport.BackColor = [System.Drawing.Color]::FromArgb(160, 60, 60)
+$btnSPTImport.ForeColor = [System.Drawing.Color]::White
+$btnSPTImport.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnSPTImport.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblSPT.Controls.Add($btnSPTImport, 1, 0)
+
+# Button: SPT verwalten
+$btnSPTManage = New-Object System.Windows.Forms.Button
+$btnSPTManage.Text = "SPT verwalten"
+$btnSPTManage.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnSPTManage.Margin = New-Object System.Windows.Forms.Padding(3, 0, 3, 0)
+$btnSPTManage.BackColor = [System.Drawing.Color]::FromArgb(100, 60, 160)
+$btnSPTManage.ForeColor = [System.Drawing.Color]::White
+$btnSPTManage.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnSPTManage.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblSPT.Controls.Add($btnSPTManage, 2, 0)
+
+# Button: SPT JSON Editor
+$btnSPTJsonEdit = New-Object System.Windows.Forms.Button
+$btnSPTJsonEdit.Text = "SPT JSON Editor"
+$btnSPTJsonEdit.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnSPTJsonEdit.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 0)
+$btnSPTJsonEdit.BackColor = [System.Drawing.Color]::FromArgb(50, 120, 80)
+$btnSPTJsonEdit.ForeColor = [System.Drawing.Color]::White
+$btnSPTJsonEdit.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnSPTJsonEdit.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblSPT.Controls.Add($btnSPTJsonEdit, 3, 0)
+
+# ============================================================================
 #  Ausgabebereich (Log)
 # ============================================================================
 $grpLog = New-Object System.Windows.Forms.GroupBox
 $grpLog.Text = "Protokoll"
-$grpLog.Location = New-Object System.Drawing.Point(15, 390)
+$grpLog.Location = New-Object System.Drawing.Point(15, 480)
 $grpLog.Size = New-Object System.Drawing.Size(770, 440)
 $grpLog.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 $form.Controls.Add($grpLog)
@@ -864,6 +931,69 @@ function Remove-ServerProfileInline {
     )
     $response = Invoke-RestMethod -Uri "$($Session.BaseUri)$ProfileUri" `
         -Method Delete -Headers $Session.Headers -SkipCertificateCheck
+    return $response
+}
+
+# ============================================================================
+#  OneView API – Server Profile Template Funktionen (Inline)
+# ============================================================================
+
+function Update-ServerProfileTemplateInline {
+    param(
+        [Parameter(Mandatory)][hashtable]$Session,
+        [Parameter(Mandatory)][object]$Template
+    )
+    $body = $Template | ConvertTo-Json -Depth 20
+    $response = Invoke-RestMethod -Uri "$($Session.BaseUri)$($Template.uri)" `
+        -Method Put -Headers $Session.Headers -Body $body -SkipCertificateCheck
+    return $response
+}
+
+function Remove-ServerProfileTemplateInline {
+    param(
+        [Parameter(Mandatory)][hashtable]$Session,
+        [Parameter(Mandatory)][string]$TemplateUri
+    )
+    $response = Invoke-RestMethod -Uri "$($Session.BaseUri)$TemplateUri" `
+        -Method Delete -Headers $Session.Headers -SkipCertificateCheck
+    return $response
+}
+
+function New-ServerProfileTemplateFromProfileInline {
+    <#
+    .SYNOPSIS  Erstellt ein neues Server Profile Template aus einem existierenden Server Profile.
+    #>
+    param(
+        [Parameter(Mandatory)][hashtable]$Session,
+        [Parameter(Mandatory)][string]$ServerProfileUri,
+        [string]$TemplateName = "",
+        [string]$Description = ""
+    )
+
+    # Profil laden
+    $profile = Invoke-RestMethod -Uri "$($Session.BaseUri)$ServerProfileUri" `
+        -Method Get -Headers $Session.Headers -SkipCertificateCheck
+
+    # Template-Body erstellen: POST /rest/server-profile-templates erwartet die Template-Felder
+    $templateBody = @{
+        type                    = "ServerProfileTemplateV8"
+        name                    = if ($TemplateName) { $TemplateName } else { "$($profile.name)_Template" }
+        description             = if ($Description) { $Description } else { "Erstellt aus Profil: $($profile.name)" }
+        serverHardwareTypeUri   = $profile.serverHardwareTypeUri
+        enclosureGroupUri       = $profile.enclosureGroupUri
+        connectionSettings      = $profile.connectionSettings
+        boot                    = $profile.boot
+        bootMode                = $profile.bootMode
+        bios                    = $profile.bios
+        firmware                = $profile.firmware
+        localStorage            = $profile.localStorage
+        sanStorage              = $profile.sanStorage
+        managementProcessor     = $profile.managementProcessor
+    }
+
+    $body = $templateBody | ConvertTo-Json -Depth 20
+    $response = Invoke-RestMethod -Uri "$($Session.BaseUri)/rest/server-profile-templates" `
+        -Method Post -Headers $Session.Headers -Body $body -SkipCertificateCheck
     return $response
 }
 
@@ -1946,6 +2076,946 @@ function Show-ServerProfileJsonEditor {
     $dlg.Dispose()
 }
 
+# ============================================================================
+#  Server Profile Template Management Dialog
+# ============================================================================
+
+function Show-ServerProfileTemplateManageDialog {
+    <#
+    .SYNOPSIS  Zeigt einen Dialog zum Verwalten von Server Profile Templates (Anzeigen, Bearbeiten, Neu, Löschen).
+    #>
+    param(
+        [Parameter(Mandatory)][hashtable]$Session,
+        [Parameter(Mandatory)][string]$Hostname
+    )
+
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = "Server Profile Templates verwalten – $Hostname"
+    $dlg.Size = New-Object System.Drawing.Size(950, 700)
+    $dlg.StartPosition = "CenterParent"
+    $dlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::Sizable
+    $dlg.MinimumSize = New-Object System.Drawing.Size(800, 550)
+    $dlg.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+    # ── Toolbar ──
+    $pnlToolbar = New-Object System.Windows.Forms.Panel
+    $pnlToolbar.Dock = [System.Windows.Forms.DockStyle]::Top
+    $pnlToolbar.Height = 40
+    $dlg.Controls.Add($pnlToolbar)
+
+    $btnRefresh = New-Object System.Windows.Forms.Button
+    $btnRefresh.Text = "Aktualisieren"
+    $btnRefresh.Location = New-Object System.Drawing.Point(10, 6)
+    $btnRefresh.Size = New-Object System.Drawing.Size(110, 28)
+    $pnlToolbar.Controls.Add($btnRefresh)
+
+    $btnNewSPT = New-Object System.Windows.Forms.Button
+    $btnNewSPT.Text = "Aus Profil erstellen"
+    $btnNewSPT.Location = New-Object System.Drawing.Point(130, 6)
+    $btnNewSPT.Size = New-Object System.Drawing.Size(140, 28)
+    $btnNewSPT.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
+    $btnNewSPT.ForeColor = [System.Drawing.Color]::White
+    $btnNewSPT.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $pnlToolbar.Controls.Add($btnNewSPT)
+
+    $btnDeleteSPT = New-Object System.Windows.Forms.Button
+    $btnDeleteSPT.Text = "Löschen"
+    $btnDeleteSPT.Location = New-Object System.Drawing.Point(280, 6)
+    $btnDeleteSPT.Size = New-Object System.Drawing.Size(80, 28)
+    $btnDeleteSPT.BackColor = [System.Drawing.Color]::FromArgb(200, 50, 50)
+    $btnDeleteSPT.ForeColor = [System.Drawing.Color]::White
+    $btnDeleteSPT.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $pnlToolbar.Controls.Add($btnDeleteSPT)
+
+    $btnExportOne = New-Object System.Windows.Forms.Button
+    $btnExportOne.Text = "Als JSON exportieren"
+    $btnExportOne.Location = New-Object System.Drawing.Point(370, 6)
+    $btnExportOne.Size = New-Object System.Drawing.Size(140, 28)
+    $pnlToolbar.Controls.Add($btnExportOne)
+
+    $btnJsonEditor = New-Object System.Windows.Forms.Button
+    $btnJsonEditor.Text = "JSON Editor"
+    $btnJsonEditor.Location = New-Object System.Drawing.Point(520, 6)
+    $btnJsonEditor.Size = New-Object System.Drawing.Size(110, 28)
+    $btnJsonEditor.BackColor = [System.Drawing.Color]::FromArgb(50, 120, 80)
+    $btnJsonEditor.ForeColor = [System.Drawing.Color]::White
+    $btnJsonEditor.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $pnlToolbar.Controls.Add($btnJsonEditor)
+
+    $btnNewProfile = New-Object System.Windows.Forms.Button
+    $btnNewProfile.Text = "Profil erzeugen"
+    $btnNewProfile.Location = New-Object System.Drawing.Point(640, 6)
+    $btnNewProfile.Size = New-Object System.Drawing.Size(120, 28)
+    $btnNewProfile.BackColor = [System.Drawing.Color]::FromArgb(100, 60, 160)
+    $btnNewProfile.ForeColor = [System.Drawing.Color]::White
+    $btnNewProfile.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $pnlToolbar.Controls.Add($btnNewProfile)
+
+    # ── SplitContainer ──
+    $splitMain = New-Object System.Windows.Forms.SplitContainer
+    $splitMain.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $splitMain.Orientation = [System.Windows.Forms.Orientation]::Vertical
+    $splitMain.SplitterDistance = 350
+    $dlg.Controls.Add($splitMain)
+    $splitMain.BringToFront()
+
+    # ── Liste (links) ──
+    $dgv = New-Object System.Windows.Forms.DataGridView
+    $dgv.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $dgv.ReadOnly = $true
+    $dgv.AllowUserToAddRows = $false
+    $dgv.AllowUserToDeleteRows = $false
+    $dgv.SelectionMode = [System.Windows.Forms.DataGridViewSelectionMode]::FullRowSelect
+    $dgv.MultiSelect = $false
+    $dgv.AutoSizeColumnsMode = [System.Windows.Forms.DataGridViewAutoSizeColumnsMode]::Fill
+    $dgv.BackgroundColor = [System.Drawing.Color]::White
+    $dgv.RowHeadersVisible = $false
+    $splitMain.Panel1.Controls.Add($dgv)
+
+    $colName = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+    $colName.HeaderText = "Name"; $colName.Name = "Name"; $colName.FillWeight = 40
+    $colStatus = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+    $colStatus.HeaderText = "Status"; $colStatus.Name = "Status"; $colStatus.FillWeight = 15
+    $colHWType = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+    $colHWType.HeaderText = "Server HW Type"; $colHWType.Name = "HWType"; $colHWType.FillWeight = 30
+    $colEncGroup = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+    $colEncGroup.HeaderText = "Enclosure Group"; $colEncGroup.Name = "EncGroup"; $colEncGroup.FillWeight = 25
+    $dgv.Columns.AddRange(@($colName, $colStatus, $colHWType, $colEncGroup))
+
+    # ── Details (rechts) ──
+    $txtDetails = New-Object System.Windows.Forms.RichTextBox
+    $txtDetails.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $txtDetails.ReadOnly = $true
+    $txtDetails.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
+    $txtDetails.ForeColor = [System.Drawing.Color]::FromArgb(200, 200, 200)
+    $txtDetails.Font = New-Object System.Drawing.Font("Consolas", 9)
+    $txtDetails.WordWrap = $false
+    $splitMain.Panel2.Controls.Add($txtDetails)
+
+    # ── Daten ──
+    $script:sptTemplates    = @()
+    $script:sptHWTypeMap    = @{}
+    $script:sptEncGroupMap  = @{}
+
+    $loadTemplates = {
+        $dgv.Rows.Clear()
+        $txtDetails.Clear()
+        try {
+            $script:sptTemplates = @(Get-ServerProfileTemplatesInline -Session $Session)
+
+            # Server Hardware Types laden für Anzeige
+            $script:sptHWTypeMap = @{}
+            try {
+                $start = 0; $pageSize = 100
+                do {
+                    $uri = "$($Session.BaseUri)/rest/server-hardware-types?start=$start&count=$pageSize"
+                    $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
+                    if ($response.members) {
+                        foreach ($hwt in $response.members) { $script:sptHWTypeMap[$hwt.uri] = $hwt.name }
+                    }
+                    $total = $response.total
+                    $start += $response.members.Count
+                } while ($script:sptHWTypeMap.Count -lt $total)
+            } catch { }
+
+            # Enclosure Groups laden für Anzeige
+            $script:sptEncGroupMap = @{}
+            try {
+                $uri = "$($Session.BaseUri)/rest/enclosure-groups?start=0&count=256"
+                $response = Invoke-RestMethod -Uri $uri -Method Get -Headers $Session.Headers -SkipCertificateCheck
+                if ($response.members) {
+                    foreach ($eg in $response.members) { $script:sptEncGroupMap[$eg.uri] = $eg.name }
+                }
+            } catch { }
+
+            foreach ($t in $script:sptTemplates) {
+                $hwTypeName  = if ($t.serverHardwareTypeUri -and $script:sptHWTypeMap.ContainsKey($t.serverHardwareTypeUri)) { $script:sptHWTypeMap[$t.serverHardwareTypeUri] } else { "(ohne)" }
+                $encGrpName  = if ($t.enclosureGroupUri -and $script:sptEncGroupMap.ContainsKey($t.enclosureGroupUri)) { $script:sptEncGroupMap[$t.enclosureGroupUri] } else { "(ohne)" }
+                $dgv.Rows.Add($t.name, $t.status, $hwTypeName, $encGrpName) | Out-Null
+            }
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Fehler beim Laden: $_", "Fehler",
+                [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        }
+    }
+
+    & $loadTemplates
+
+    # ── Selection Changed ──
+    $dgv.Add_SelectionChanged({
+        if ($dgv.SelectedRows.Count -eq 0) { return }
+        $idx = $dgv.SelectedRows[0].Index
+        if ($idx -ge 0 -and $idx -lt $script:sptTemplates.Count) {
+            $selected = $script:sptTemplates[$idx]
+            $json = $selected | ConvertTo-Json -Depth 10
+            $txtDetails.Clear()
+            $txtDetails.Text = $json
+        }
+    })
+
+    # ── Refresh ──
+    $btnRefresh.Add_Click({ & $loadTemplates })
+
+    # ── Aus Profil erstellen ──
+    $btnNewSPT.Add_Click({
+        # Profile laden und Auswahldialog zeigen
+        $dlg.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+        try {
+            $profiles = @(Get-ServerProfilesInline -Session $Session)
+            if ($profiles.Count -eq 0) {
+                [System.Windows.Forms.MessageBox]::Show("Keine Server Profile gefunden.", "Keine Profile",
+                    [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+                return
+            }
+
+            $pickDlg = New-Object System.Windows.Forms.Form
+            $pickDlg.Text = "Server Profile als Vorlage auswählen"
+            $pickDlg.Size = New-Object System.Drawing.Size(500, 520)
+            $pickDlg.StartPosition = "CenterParent"
+            $pickDlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+            $pickDlg.MaximizeBox = $false; $pickDlg.MinimizeBox = $false
+            $pickDlg.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+            $lblPick = New-Object System.Windows.Forms.Label
+            $lblPick.Text = "Profil auswählen, aus dem ein Template erstellt werden soll:"
+            $lblPick.Location = New-Object System.Drawing.Point(15, 12)
+            $lblPick.Size = New-Object System.Drawing.Size(460, 20)
+            $pickDlg.Controls.Add($lblPick)
+
+            $lstProfiles = New-Object System.Windows.Forms.ListBox
+            $lstProfiles.Location = New-Object System.Drawing.Point(15, 38)
+            $lstProfiles.Size = New-Object System.Drawing.Size(455, 280)
+            $lstProfiles.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+            foreach ($p in ($profiles | Sort-Object -Property name)) {
+                $lstProfiles.Items.Add("$($p.name)  [$($p.status)]") | Out-Null
+            }
+            if ($lstProfiles.Items.Count -gt 0) { $lstProfiles.SelectedIndex = 0 }
+            $pickDlg.Controls.Add($lstProfiles)
+
+            $lblName = New-Object System.Windows.Forms.Label
+            $lblName.Text = "Template-Name:"
+            $lblName.Location = New-Object System.Drawing.Point(15, 330)
+            $lblName.Size = New-Object System.Drawing.Size(110, 20)
+            $pickDlg.Controls.Add($lblName)
+
+            $txtTplName = New-Object System.Windows.Forms.TextBox
+            $txtTplName.Location = New-Object System.Drawing.Point(130, 328)
+            $txtTplName.Size = New-Object System.Drawing.Size(340, 23)
+            $pickDlg.Controls.Add($txtTplName)
+
+            $lblDesc = New-Object System.Windows.Forms.Label
+            $lblDesc.Text = "Beschreibung:"
+            $lblDesc.Location = New-Object System.Drawing.Point(15, 362)
+            $lblDesc.Size = New-Object System.Drawing.Size(110, 20)
+            $pickDlg.Controls.Add($lblDesc)
+
+            $txtTplDesc = New-Object System.Windows.Forms.TextBox
+            $txtTplDesc.Location = New-Object System.Drawing.Point(130, 360)
+            $txtTplDesc.Size = New-Object System.Drawing.Size(340, 23)
+            $pickDlg.Controls.Add($txtTplDesc)
+
+            # Name automatisch setzen wenn Profil gewählt wird
+            $lstProfiles.Add_SelectedIndexChanged({
+                if ($lstProfiles.SelectedIndex -ge 0) {
+                    $sortedP = $profiles | Sort-Object -Property name
+                    $selP = $sortedP[$lstProfiles.SelectedIndex]
+                    if ([string]::IsNullOrWhiteSpace($txtTplName.Text) -or $txtTplName.Text -match '_Template$') {
+                        $txtTplName.Text = "$($selP.name)_Template"
+                    }
+                }
+            })
+            # Initial setzen
+            if ($lstProfiles.SelectedIndex -ge 0) {
+                $sortedP = $profiles | Sort-Object -Property name
+                $txtTplName.Text = "$($sortedP[0].name)_Template"
+            }
+
+            $btnPickOK = New-Object System.Windows.Forms.Button
+            $btnPickOK.Text = "Erstellen"
+            $btnPickOK.Size = New-Object System.Drawing.Size(90, 30)
+            $btnPickOK.Location = New-Object System.Drawing.Point(295, 400)
+            $btnPickOK.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
+            $btnPickOK.ForeColor = [System.Drawing.Color]::White
+            $btnPickOK.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+            $btnPickOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $pickDlg.AcceptButton = $btnPickOK
+            $pickDlg.Controls.Add($btnPickOK)
+
+            $btnPickCancel = New-Object System.Windows.Forms.Button
+            $btnPickCancel.Text = "Abbrechen"
+            $btnPickCancel.Size = New-Object System.Drawing.Size(80, 30)
+            $btnPickCancel.Location = New-Object System.Drawing.Point(390, 400)
+            $btnPickCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+            $pickDlg.CancelButton = $btnPickCancel
+            $pickDlg.Controls.Add($btnPickCancel)
+
+            $pickResult = $pickDlg.ShowDialog($dlg)
+
+            if ($pickResult -eq [System.Windows.Forms.DialogResult]::OK -and $lstProfiles.SelectedIndex -ge 0) {
+                $sortedP = $profiles | Sort-Object -Property name
+                $selectedProfile = $sortedP[$lstProfiles.SelectedIndex]
+                $tplName = $txtTplName.Text.Trim()
+                $tplDesc = $txtTplDesc.Text.Trim()
+
+                if ([string]::IsNullOrWhiteSpace($tplName)) {
+                    [System.Windows.Forms.MessageBox]::Show("Bitte einen Template-Namen eingeben.", "Pflichtfeld",
+                        [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+                    $pickDlg.Dispose()
+                    return
+                }
+
+                try {
+                    New-ServerProfileTemplateFromProfileInline -Session $Session `
+                        -ServerProfileUri $selectedProfile.uri `
+                        -TemplateName $tplName -Description $tplDesc
+
+                    [System.Windows.Forms.MessageBox]::Show(
+                        "Template '$tplName' wurde aus Profil '$($selectedProfile.name)' erstellt.",
+                        "Erfolgreich",
+                        [System.Windows.Forms.MessageBoxButtons]::OK,
+                        [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+                    & $loadTemplates
+                } catch {
+                    [System.Windows.Forms.MessageBox]::Show("Fehler beim Erstellen: $_", "Fehler",
+                        [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+                }
+            }
+            $pickDlg.Dispose()
+
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Fehler: $_", "Fehler",
+                [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        } finally {
+            $dlg.Cursor = [System.Windows.Forms.Cursors]::Default
+        }
+    })
+
+    # ── Löschen ──
+    $btnDeleteSPT.Add_Click({
+        if ($dgv.SelectedRows.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("Bitte ein Template auswählen.", "Hinweis",
+                [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            return
+        }
+        $idx = $dgv.SelectedRows[0].Index
+        if ($idx -lt 0 -or $idx -ge $script:sptTemplates.Count) { return }
+        $template = $script:sptTemplates[$idx]
+
+        $confirm = [System.Windows.Forms.MessageBox]::Show(
+            "Server Profile Template '$($template.name)' wirklich löschen?`n`nDiese Aktion kann nicht rückgängig gemacht werden!",
+            "Template löschen",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        )
+        if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+
+        try {
+            Remove-ServerProfileTemplateInline -Session $Session -TemplateUri $template.uri
+            [System.Windows.Forms.MessageBox]::Show("Template '$($template.name)' wurde gelöscht.", "Erfolgreich",
+                [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            & $loadTemplates
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Fehler beim Löschen: $_", "Fehler",
+                [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        }
+    })
+
+    # ── Einzelexport ──
+    $btnExportOne.Add_Click({
+        if ($dgv.SelectedRows.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("Bitte ein Template auswählen.", "Hinweis",
+                [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            return
+        }
+        $idx = $dgv.SelectedRows[0].Index
+        if ($idx -lt 0 -or $idx -ge $script:sptTemplates.Count) { return }
+        $template = $script:sptTemplates[$idx]
+
+        $sfd = New-Object System.Windows.Forms.SaveFileDialog
+        $sfd.Filter = "JSON Dateien (*.json)|*.json"
+        $sfd.FileName = ($template.name -replace '[\\/:*?\"<>|\s]', '_') + ".json"
+        $sfd.Title = "Template als JSON exportieren"
+        if ($sfd.ShowDialog($dlg) -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+        $template | ConvertTo-Json -Depth 20 | Set-Content -Path $sfd.FileName -Encoding UTF8
+        [System.Windows.Forms.MessageBox]::Show("Exportiert nach:`n$($sfd.FileName)", "Export erfolgreich",
+            [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+    })
+
+    # ── JSON Editor ──
+    $btnJsonEditor.Add_Click({
+        $initialJson = ""
+        if ($dgv.SelectedRows.Count -gt 0) {
+            $idx = $dgv.SelectedRows[0].Index
+            if ($idx -ge 0 -and $idx -lt $script:sptTemplates.Count) {
+                $initialJson = $script:sptTemplates[$idx] | ConvertTo-Json -Depth 20
+            }
+        }
+        Show-ServerProfileTemplateJsonEditor -Session $Session -Hostname $Hostname -InitialJson $initialJson
+        & $loadTemplates
+    })
+
+    # ── Profil aus Template erzeugen ──
+    $btnNewProfile.Add_Click({
+        if ($dgv.SelectedRows.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("Bitte ein Template auswählen.", "Hinweis",
+                [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            return
+        }
+        $idx = $dgv.SelectedRows[0].Index
+        if ($idx -lt 0 -or $idx -ge $script:sptTemplates.Count) { return }
+        $template = $script:sptTemplates[$idx]
+
+        # Profilname-Dialog
+        $nameDlg = New-Object System.Windows.Forms.Form
+        $nameDlg.Text = "Neues Server Profile aus Template"
+        $nameDlg.Size = New-Object System.Drawing.Size(450, 250)
+        $nameDlg.StartPosition = "CenterParent"
+        $nameDlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+        $nameDlg.MaximizeBox = $false; $nameDlg.MinimizeBox = $false
+        $nameDlg.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+        $lblTpl = New-Object System.Windows.Forms.Label
+        $lblTpl.Text = "Template: $($template.name)"
+        $lblTpl.Location = New-Object System.Drawing.Point(15, 15)
+        $lblTpl.Size = New-Object System.Drawing.Size(400, 20)
+        $lblTpl.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+        $nameDlg.Controls.Add($lblTpl)
+
+        $lblN = New-Object System.Windows.Forms.Label
+        $lblN.Text = "Profil-Name:"
+        $lblN.Location = New-Object System.Drawing.Point(15, 50)
+        $lblN.Size = New-Object System.Drawing.Size(100, 20)
+        $nameDlg.Controls.Add($lblN)
+        $txtProfName = New-Object System.Windows.Forms.TextBox
+        $txtProfName.Location = New-Object System.Drawing.Point(120, 48)
+        $txtProfName.Size = New-Object System.Drawing.Size(290, 23)
+        $nameDlg.Controls.Add($txtProfName)
+
+        $lblD = New-Object System.Windows.Forms.Label
+        $lblD.Text = "Beschreibung:"
+        $lblD.Location = New-Object System.Drawing.Point(15, 82)
+        $lblD.Size = New-Object System.Drawing.Size(100, 20)
+        $nameDlg.Controls.Add($lblD)
+        $txtProfDesc = New-Object System.Windows.Forms.TextBox
+        $txtProfDesc.Location = New-Object System.Drawing.Point(120, 80)
+        $txtProfDesc.Size = New-Object System.Drawing.Size(290, 23)
+        $nameDlg.Controls.Add($txtProfDesc)
+
+        # Server Hardware auswählen
+        $lblHW = New-Object System.Windows.Forms.Label
+        $lblHW.Text = "Server Hardware:"
+        $lblHW.Location = New-Object System.Drawing.Point(15, 114)
+        $lblHW.Size = New-Object System.Drawing.Size(100, 20)
+        $nameDlg.Controls.Add($lblHW)
+        $cmbHW = New-Object System.Windows.Forms.ComboBox
+        $cmbHW.Location = New-Object System.Drawing.Point(120, 112)
+        $cmbHW.Size = New-Object System.Drawing.Size(290, 23)
+        $cmbHW.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+        $cmbHW.Items.Add("(Nicht zugewiesen)") | Out-Null
+        try {
+            $hwList = @(Get-ServerHardwareInline -Session $Session)
+            foreach ($h in ($hwList | Sort-Object -Property name)) {
+                $tag = if ($h.state -eq "NoProfileApplied") { " [verfügbar]" } else { " [belegt]" }
+                $cmbHW.Items.Add("$($h.name)$tag") | Out-Null
+            }
+        } catch { }
+        $cmbHW.SelectedIndex = 0
+        $nameDlg.Controls.Add($cmbHW)
+
+        $btnOK = New-Object System.Windows.Forms.Button
+        $btnOK.Text = "Erstellen"
+        $btnOK.Size = New-Object System.Drawing.Size(90, 30)
+        $btnOK.Location = New-Object System.Drawing.Point(230, 160)
+        $btnOK.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
+        $btnOK.ForeColor = [System.Drawing.Color]::White
+        $btnOK.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+        $btnOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $nameDlg.AcceptButton = $btnOK
+        $nameDlg.Controls.Add($btnOK)
+
+        $btnCn = New-Object System.Windows.Forms.Button
+        $btnCn.Text = "Abbrechen"
+        $btnCn.Size = New-Object System.Drawing.Size(80, 30)
+        $btnCn.Location = New-Object System.Drawing.Point(325, 160)
+        $btnCn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+        $nameDlg.CancelButton = $btnCn
+        $nameDlg.Controls.Add($btnCn)
+
+        $nameResult = $nameDlg.ShowDialog($dlg)
+
+        if ($nameResult -eq [System.Windows.Forms.DialogResult]::OK) {
+            $profName = $txtProfName.Text.Trim()
+            if ([string]::IsNullOrWhiteSpace($profName)) {
+                [System.Windows.Forms.MessageBox]::Show("Bitte einen Profil-Namen eingeben.", "Pflichtfeld",
+                    [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+                $nameDlg.Dispose()
+                return
+            }
+
+            $hwUri = ""
+            if ($cmbHW.SelectedIndex -gt 0) {
+                $sortedHW = $hwList | Sort-Object -Property name
+                $hwUri = $sortedHW[$cmbHW.SelectedIndex - 1].uri
+            }
+
+            try {
+                New-ServerProfileFromTemplateInline -Session $Session `
+                    -TemplateUri $template.uri -ProfileName $profName `
+                    -Description $txtProfDesc.Text.Trim() -ServerHardwareUri $hwUri
+
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Server Profile '$profName' wurde aus Template '$($template.name)' erstellt.",
+                    "Erfolgreich",
+                    [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+            } catch {
+                [System.Windows.Forms.MessageBox]::Show("Fehler beim Erstellen: $_", "Fehler",
+                    [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+            }
+        }
+        $nameDlg.Dispose()
+    })
+
+    $dlg.ShowDialog($form) | Out-Null
+    $dlg.Dispose()
+}
+
+# ============================================================================
+#  JSON Editor Dialog – Server Profile Templates
+# ============================================================================
+function Show-ServerProfileTemplateJsonEditor {
+    <#
+    .SYNOPSIS  JSON-Editor zum vollständigen Bearbeiten, Erstellen und Updaten von Server Profile Templates.
+    #>
+    param(
+        [Parameter(Mandatory)][hashtable]$Session,
+        [string]$Hostname = "",
+        [string]$InitialJson = "",
+        [string]$InitialFilePath = ""
+    )
+
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = "Server Profile Template – JSON Editor$(if ($Hostname) { " – $Hostname" })"
+    $dlg.Size = New-Object System.Drawing.Size(950, 750)
+    $dlg.StartPosition = "CenterParent"
+    $dlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::Sizable
+    $dlg.MinimumSize = New-Object System.Drawing.Size(700, 500)
+    $dlg.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+    # ── Toolbar oben ──
+    $pnlTop = New-Object System.Windows.Forms.Panel
+    $pnlTop.Dock = [System.Windows.Forms.DockStyle]::Top
+    $pnlTop.Height = 44
+    $dlg.Controls.Add($pnlTop)
+
+    $btnLoadFile = New-Object System.Windows.Forms.Button
+    $btnLoadFile.Text = "JSON laden"
+    $btnLoadFile.Location = New-Object System.Drawing.Point(10, 8)
+    $btnLoadFile.Size = New-Object System.Drawing.Size(100, 28)
+    $pnlTop.Controls.Add($btnLoadFile)
+
+    $btnSaveFile = New-Object System.Windows.Forms.Button
+    $btnSaveFile.Text = "JSON speichern"
+    $btnSaveFile.Location = New-Object System.Drawing.Point(118, 8)
+    $btnSaveFile.Size = New-Object System.Drawing.Size(110, 28)
+    $pnlTop.Controls.Add($btnSaveFile)
+
+    $btnValidate = New-Object System.Windows.Forms.Button
+    $btnValidate.Text = "Validieren"
+    $btnValidate.Location = New-Object System.Drawing.Point(236, 8)
+    $btnValidate.Size = New-Object System.Drawing.Size(90, 28)
+    $pnlTop.Controls.Add($btnValidate)
+
+    $btnFormat = New-Object System.Windows.Forms.Button
+    $btnFormat.Text = "Formatieren"
+    $btnFormat.Location = New-Object System.Drawing.Point(334, 8)
+    $btnFormat.Size = New-Object System.Drawing.Size(95, 28)
+    $pnlTop.Controls.Add($btnFormat)
+
+    $sep = New-Object System.Windows.Forms.Label
+    $sep.Text = "|"
+    $sep.Location = New-Object System.Drawing.Point(440, 12)
+    $sep.Size = New-Object System.Drawing.Size(10, 20)
+    $sep.ForeColor = [System.Drawing.Color]::Gray
+    $pnlTop.Controls.Add($sep)
+
+    $btnCreateOV = New-Object System.Windows.Forms.Button
+    $btnCreateOV.Text = "Neu anlegen (OneView)"
+    $btnCreateOV.Location = New-Object System.Drawing.Point(458, 8)
+    $btnCreateOV.Size = New-Object System.Drawing.Size(155, 28)
+    $btnCreateOV.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 212)
+    $btnCreateOV.ForeColor = [System.Drawing.Color]::White
+    $btnCreateOV.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $pnlTop.Controls.Add($btnCreateOV)
+
+    $btnUpdateOV = New-Object System.Windows.Forms.Button
+    $btnUpdateOV.Text = "Update (OneView)"
+    $btnUpdateOV.Location = New-Object System.Drawing.Point(621, 8)
+    $btnUpdateOV.Size = New-Object System.Drawing.Size(135, 28)
+    $btnUpdateOV.BackColor = [System.Drawing.Color]::FromArgb(0, 150, 80)
+    $btnUpdateOV.ForeColor = [System.Drawing.Color]::White
+    $btnUpdateOV.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $pnlTop.Controls.Add($btnUpdateOV)
+
+    $btnLoadOV = New-Object System.Windows.Forms.Button
+    $btnLoadOV.Text = "Von OneView laden"
+    $btnLoadOV.Location = New-Object System.Drawing.Point(764, 8)
+    $btnLoadOV.Size = New-Object System.Drawing.Size(135, 28)
+    $btnLoadOV.BackColor = [System.Drawing.Color]::FromArgb(100, 60, 160)
+    $btnLoadOV.ForeColor = [System.Drawing.Color]::White
+    $btnLoadOV.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $pnlTop.Controls.Add($btnLoadOV)
+
+    # ── Statusleiste ──
+    $lblStatus = New-Object System.Windows.Forms.Label
+    $lblStatus.Dock = [System.Windows.Forms.DockStyle]::Bottom
+    $lblStatus.Height = 24
+    $lblStatus.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+    $lblStatus.BackColor = [System.Drawing.Color]::FromArgb(240, 240, 240)
+    $lblStatus.Text = "Bereit"
+    $dlg.Controls.Add($lblStatus)
+
+    # ── JSON Text Editor ──
+    $txtJson = New-Object System.Windows.Forms.RichTextBox
+    $txtJson.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $txtJson.Font = New-Object System.Drawing.Font("Consolas", 10)
+    $txtJson.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
+    $txtJson.ForeColor = [System.Drawing.Color]::FromArgb(212, 212, 212)
+    $txtJson.WordWrap = $false
+    $txtJson.AcceptsTab = $true
+    $txtJson.ShortcutsEnabled = $true
+    $txtJson.DetectUrls = $false
+    $dlg.Controls.Add($txtJson)
+    $txtJson.BringToFront()
+
+    $script:jsonEditorFilePath = $InitialFilePath
+
+    if ($InitialJson) {
+        $txtJson.Text = $InitialJson
+        $lblStatus.Text = if ($InitialFilePath) { "Geladen: $InitialFilePath" } else { "Template aus OneView geladen" }
+    }
+
+    # ── Hilfsfunktion: JSON validieren ──
+    $validateJson = {
+        try {
+            $null = $txtJson.Text | ConvertFrom-Json -ErrorAction Stop
+            return $true
+        } catch {
+            return $false
+        }
+    }
+
+    # ── Hilfsfunktion: Read-Only-Felder entfernen (für Create) ──
+    $removeReadOnlyFields = {
+        param([hashtable]$ht)
+        $readOnlyFields = @(
+            "uri", "eTag", "created", "modified", "uuid",
+            "taskUri", "stateReason", "refreshState",
+            "inProgress", "scopesUri"
+        )
+        foreach ($f in $readOnlyFields) { $ht.Remove($f) }
+        return $ht
+    }
+
+    # ── JSON laden ──
+    $btnLoadFile.Add_Click({
+        $ofd = New-Object System.Windows.Forms.OpenFileDialog
+        $ofd.Filter = "JSON Dateien (*.json)|*.json|Alle Dateien (*.*)|*.*"
+        $ofd.Title = "Server Profile Template JSON laden"
+        if ($ofd.ShowDialog($dlg) -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+        try {
+            $content = Get-Content -Path $ofd.FileName -Raw -Encoding UTF8
+            $null = $content | ConvertFrom-Json -ErrorAction Stop
+            $obj = $content | ConvertFrom-Json
+            $txtJson.Text = $obj | ConvertTo-Json -Depth 20
+            $script:jsonEditorFilePath = $ofd.FileName
+            $lblStatus.Text = "Geladen: $($ofd.FileName)"
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Fehler beim Laden der Datei:`n$_",
+                "Fehler", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        }
+    })
+
+    # ── JSON speichern ──
+    $btnSaveFile.Add_Click({
+        if (-not (& $validateJson)) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Das JSON ist ungültig. Bitte korrigieren Sie die Syntax.",
+                "JSON ungültig", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+            return
+        }
+
+        $sfd = New-Object System.Windows.Forms.SaveFileDialog
+        $sfd.Filter = "JSON Dateien (*.json)|*.json"
+        $sfd.Title = "Server Profile Template JSON speichern"
+        if ($script:jsonEditorFilePath) {
+            $sfd.FileName = [System.IO.Path]::GetFileName($script:jsonEditorFilePath)
+            $sfd.InitialDirectory = [System.IO.Path]::GetDirectoryName($script:jsonEditorFilePath)
+        } else {
+            try {
+                $obj = $txtJson.Text | ConvertFrom-Json
+                if ($obj.name) { $sfd.FileName = ($obj.name -replace '[\\/:*?\"<>|\s]', '_') + ".json" }
+            } catch {}
+        }
+        if ($sfd.ShowDialog($dlg) -ne [System.Windows.Forms.DialogResult]::OK) { return }
+
+        try {
+            $obj = $txtJson.Text | ConvertFrom-Json
+            $obj | ConvertTo-Json -Depth 20 | Set-Content -Path $sfd.FileName -Encoding UTF8
+            $script:jsonEditorFilePath = $sfd.FileName
+            $lblStatus.Text = "Gespeichert: $($sfd.FileName)"
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Fehler beim Speichern:`n$_",
+                "Fehler", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        }
+    })
+
+    # ── Validieren ──
+    $btnValidate.Add_Click({
+        if (& $validateJson) {
+            $obj = $txtJson.Text | ConvertFrom-Json
+            $fields = ($obj | Get-Member -MemberType NoteProperty).Count
+            $lblStatus.Text = "JSON ist gültig ($fields Felder auf Root-Ebene)"
+            [System.Windows.Forms.MessageBox]::Show(
+                "JSON ist gültig.`n`nRoot-Felder: $fields`nName: $($obj.name)",
+                "Validierung OK", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        } else {
+            $lblStatus.Text = "JSON ist UNGÜLTIG!"
+            try {
+                $null = $txtJson.Text | ConvertFrom-Json -ErrorAction Stop
+            } catch {
+                [System.Windows.Forms.MessageBox]::Show(
+                    "JSON ist ungültig:`n`n$($_.Exception.Message)",
+                    "Validierung fehlgeschlagen", [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+            }
+        }
+    })
+
+    # ── Formatieren ──
+    $btnFormat.Add_Click({
+        if (-not (& $validateJson)) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "JSON kann nicht formatiert werden – Syntax ungültig.",
+                "Fehler", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+            return
+        }
+        $obj = $txtJson.Text | ConvertFrom-Json
+        $txtJson.Text = $obj | ConvertTo-Json -Depth 20
+        $lblStatus.Text = "JSON formatiert"
+    })
+
+    # ── Neu anlegen in OneView ──
+    $btnCreateOV.Add_Click({
+        if (-not (& $validateJson)) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Das JSON ist ungültig. Bitte zuerst korrigieren.",
+                "JSON ungültig", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+            return
+        }
+
+        $obj = $txtJson.Text | ConvertFrom-Json
+        $templateName = if ($obj.name) { $obj.name } else { "(unbenannt)" }
+
+        $confirm = [System.Windows.Forms.MessageBox]::Show(
+            "Server Profile Template '$templateName' als neues Template in OneView anlegen?`n`nRead-Only-Felder (uri, eTag, etc.) werden automatisch entfernt.",
+            "Template erstellen",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Question)
+        if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+
+        $dlg.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+        $btnCreateOV.Enabled = $false
+        $btnUpdateOV.Enabled = $false
+        $lblStatus.Text = "Erstelle Template '$templateName'..."
+
+        try {
+            $ht = $txtJson.Text | ConvertFrom-Json -AsHashtable
+            $cleanHt = & $removeReadOnlyFields $ht
+
+            $body = $cleanHt | ConvertTo-Json -Depth 20
+            $response = Invoke-RestMethod -Uri "$($Session.BaseUri)/rest/server-profile-templates" `
+                -Method Post -Headers $Session.Headers -Body $body `
+                -ContentType "application/json" -SkipCertificateCheck
+
+            $lblStatus.Text = "Template '$templateName' erfolgreich erstellt"
+            [System.Windows.Forms.MessageBox]::Show(
+                "Server Profile Template '$templateName' wurde erfolgreich erstellt.",
+                "Erfolgreich", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        } catch {
+            $lblStatus.Text = "Fehler beim Erstellen"
+            [System.Windows.Forms.MessageBox]::Show(
+                "Fehler beim Erstellen:`n`n$($_.Exception.Message)",
+                "Fehler", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        } finally {
+            $dlg.Cursor = [System.Windows.Forms.Cursors]::Default
+            $btnCreateOV.Enabled = $true
+            $btnUpdateOV.Enabled = $true
+        }
+    })
+
+    # ── Update in OneView ──
+    $btnUpdateOV.Add_Click({
+        if (-not (& $validateJson)) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Das JSON ist ungültig. Bitte zuerst korrigieren.",
+                "JSON ungültig", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+            return
+        }
+
+        $obj = $txtJson.Text | ConvertFrom-Json
+        $templateName = if ($obj.name) { $obj.name } else { "(unbenannt)" }
+
+        if (-not $obj.uri) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Das Template enthält kein 'uri'-Feld.`n`nEin Update ist nur für bestehende Templates möglich, die ein 'uri'-Feld besitzen.`nLaden Sie das Template direkt von OneView oder verwenden Sie 'Neu anlegen'.",
+                "URI fehlt", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+            return
+        }
+
+        $confirm = [System.Windows.Forms.MessageBox]::Show(
+            "Server Profile Template '$templateName' in OneView aktualisieren?`n`nURI: $($obj.uri)`n`nAlle Änderungen im JSON werden auf das bestehende Template angewendet.",
+            "Template aktualisieren",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Question)
+        if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+
+        $dlg.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+        $btnCreateOV.Enabled = $false
+        $btnUpdateOV.Enabled = $false
+        $lblStatus.Text = "Aktualisiere Template '$templateName'..."
+
+        try {
+            $body = $txtJson.Text
+            $response = Invoke-RestMethod -Uri "$($Session.BaseUri)$($obj.uri)" `
+                -Method Put -Headers $Session.Headers -Body $body `
+                -ContentType "application/json" -SkipCertificateCheck
+
+            $lblStatus.Text = "Template '$templateName' erfolgreich aktualisiert"
+            [System.Windows.Forms.MessageBox]::Show(
+                "Server Profile Template '$templateName' wurde erfolgreich aktualisiert.",
+                "Erfolgreich", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+        } catch {
+            $lblStatus.Text = "Fehler beim Aktualisieren"
+            [System.Windows.Forms.MessageBox]::Show(
+                "Fehler beim Aktualisieren:`n`n$($_.Exception.Message)",
+                "Fehler", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        } finally {
+            $dlg.Cursor = [System.Windows.Forms.Cursors]::Default
+            $btnCreateOV.Enabled = $true
+            $btnUpdateOV.Enabled = $true
+        }
+    })
+
+    # ── Von OneView laden (Template auswählen) ──
+    $btnLoadOV.Add_Click({
+        $dlg.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+        $lblStatus.Text = "Lade Templates von OneView..."
+
+        try {
+            $templates = @(Get-ServerProfileTemplatesInline -Session $Session)
+
+            if ($templates.Count -eq 0) {
+                $lblStatus.Text = "Keine Templates gefunden"
+                [System.Windows.Forms.MessageBox]::Show(
+                    "Keine Server Profile Templates auf dieser Appliance gefunden.",
+                    "Keine Templates", [System.Windows.Forms.MessageBoxButtons]::OK,
+                    [System.Windows.Forms.MessageBoxIcon]::Information) | Out-Null
+                return
+            }
+
+            $pickDlg = New-Object System.Windows.Forms.Form
+            $pickDlg.Text = "Server Profile Template auswählen"
+            $pickDlg.Size = New-Object System.Drawing.Size(500, 450)
+            $pickDlg.StartPosition = "CenterParent"
+            $pickDlg.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+            $pickDlg.MaximizeBox = $false; $pickDlg.MinimizeBox = $false
+            $pickDlg.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+            $lblPick = New-Object System.Windows.Forms.Label
+            $lblPick.Text = "Wählen Sie ein Template zum Laden in den Editor:"
+            $lblPick.Location = New-Object System.Drawing.Point(15, 12)
+            $lblPick.Size = New-Object System.Drawing.Size(460, 20)
+            $pickDlg.Controls.Add($lblPick)
+
+            $lstTemplates = New-Object System.Windows.Forms.ListBox
+            $lstTemplates.Location = New-Object System.Drawing.Point(15, 38)
+            $lstTemplates.Size = New-Object System.Drawing.Size(455, 320)
+            $lstTemplates.Font = New-Object System.Drawing.Font("Segoe UI", 10)
+            foreach ($t in ($templates | Sort-Object -Property name)) {
+                $lstTemplates.Items.Add("$($t.name)  [$($t.status)]") | Out-Null
+            }
+            if ($lstTemplates.Items.Count -gt 0) { $lstTemplates.SelectedIndex = 0 }
+            $pickDlg.Controls.Add($lstTemplates)
+
+            $btnPickOK = New-Object System.Windows.Forms.Button
+            $btnPickOK.Text = "Laden"
+            $btnPickOK.Size = New-Object System.Drawing.Size(80, 30)
+            $btnPickOK.Location = New-Object System.Drawing.Point(305, 370)
+            $btnPickOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $pickDlg.AcceptButton = $btnPickOK
+            $pickDlg.Controls.Add($btnPickOK)
+
+            $btnPickCancel = New-Object System.Windows.Forms.Button
+            $btnPickCancel.Text = "Abbrechen"
+            $btnPickCancel.Size = New-Object System.Drawing.Size(80, 30)
+            $btnPickCancel.Location = New-Object System.Drawing.Point(390, 370)
+            $btnPickCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+            $pickDlg.CancelButton = $btnPickCancel
+            $pickDlg.Controls.Add($btnPickCancel)
+
+            $lstTemplates.Add_DoubleClick({
+                $pickDlg.DialogResult = [System.Windows.Forms.DialogResult]::OK
+                $pickDlg.Close()
+            })
+
+            $pickResult = $pickDlg.ShowDialog($dlg)
+
+            if ($pickResult -eq [System.Windows.Forms.DialogResult]::OK -and $lstTemplates.SelectedIndex -ge 0) {
+                $sortedTemplates = $templates | Sort-Object -Property name
+                $selectedTemplate = $sortedTemplates[$lstTemplates.SelectedIndex]
+
+                $fullTemplate = Invoke-RestMethod -Uri "$($Session.BaseUri)$($selectedTemplate.uri)" `
+                    -Method Get -Headers $Session.Headers -SkipCertificateCheck
+
+                $txtJson.Text = $fullTemplate | ConvertTo-Json -Depth 20
+                $script:jsonEditorFilePath = ""
+                $lblStatus.Text = "Geladen von OneView: $($fullTemplate.name)"
+            }
+
+            $pickDlg.Dispose()
+
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Fehler beim Laden von OneView:`n$_",
+                "Fehler", [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error) | Out-Null
+        } finally {
+            $dlg.Cursor = [System.Windows.Forms.Cursors]::Default
+            $lblStatus.Text = if ($txtJson.Text) { $lblStatus.Text } else { "Bereit" }
+        }
+    })
+
+    $dlg.ShowDialog($form) | Out-Null
+    $dlg.Dispose()
+}
+
 function Test-InputValid {
     if ([string]::IsNullOrWhiteSpace($txtUser.Text) -or [string]::IsNullOrWhiteSpace($txtPass.Text)) {
         [System.Windows.Forms.MessageBox]::Show(
@@ -2117,6 +3187,10 @@ $btnImport.Add_Click({
     $btnSPImport.Enabled = $false
     $btnSPManage.Enabled = $false
     $btnSPJsonEdit.Enabled = $false
+    $btnSPTExport.Enabled = $false
+    $btnSPTImport.Enabled = $false
+    $btnSPTManage.Enabled = $false
+    $btnSPTJsonEdit.Enabled = $false
     $rtbLog.Clear()
 
     try {
@@ -2163,6 +3237,10 @@ function Read-Host { param([string]`$Prompt) return 'J' }
         $btnSPImport.Enabled = $true
         $btnSPManage.Enabled = $true
         $btnSPJsonEdit.Enabled = $true
+        $btnSPTExport.Enabled = $true
+        $btnSPTImport.Enabled = $true
+        $btnSPTManage.Enabled = $true
+        $btnSPTJsonEdit.Enabled = $true
     }
 })
 
@@ -2286,6 +3364,10 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
         $btnSPImport.Enabled = $true
         $btnSPManage.Enabled = $true
         $btnSPJsonEdit.Enabled = $true
+        $btnSPTExport.Enabled = $true
+        $btnSPTImport.Enabled = $true
+        $btnSPTManage.Enabled = $true
+        $btnSPTJsonEdit.Enabled = $true
     }
 })
 
@@ -2416,6 +3498,10 @@ $btnMultiDeploy.Add_Click({
     $btnSPImport.Enabled = $false
     $btnSPManage.Enabled = $false
     $btnSPJsonEdit.Enabled = $false
+    $btnSPTExport.Enabled = $false
+    $btnSPTImport.Enabled = $false
+    $btnSPTManage.Enabled = $false
+    $btnSPTJsonEdit.Enabled = $false
     $rtbLog.Clear()
 
     $tempExcelFiles = @()
@@ -2526,6 +3612,10 @@ function Read-Host { param([string]`$Prompt) return 'J' }
         $btnSPImport.Enabled = $true
         $btnSPManage.Enabled = $true
         $btnSPJsonEdit.Enabled = $true
+        $btnSPTExport.Enabled = $true
+        $btnSPTImport.Enabled = $true
+        $btnSPTManage.Enabled = $true
+        $btnSPTJsonEdit.Enabled = $true
     }
 })
 
@@ -2646,6 +3736,10 @@ $btnNSBackup.Add_Click({
     $btnSPImport.Enabled = $false
     $btnSPManage.Enabled = $false
     $btnSPJsonEdit.Enabled = $false
+    $btnSPTExport.Enabled = $false
+    $btnSPTImport.Enabled = $false
+    $btnSPTManage.Enabled = $false
+    $btnSPTJsonEdit.Enabled = $false
     $rtbLog.Clear()
 
     try {
@@ -2724,6 +3818,10 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
         $btnSPImport.Enabled = $true
         $btnSPManage.Enabled = $true
         $btnSPJsonEdit.Enabled = $true
+        $btnSPTExport.Enabled = $true
+        $btnSPTImport.Enabled = $true
+        $btnSPTManage.Enabled = $true
+        $btnSPTJsonEdit.Enabled = $true
     }
 })
 
@@ -2760,6 +3858,10 @@ $btnSPExport.Add_Click({
     $btnSPImport.Enabled = $false
     $btnSPManage.Enabled = $false
     $btnSPJsonEdit.Enabled = $false
+    $btnSPTExport.Enabled = $false
+    $btnSPTImport.Enabled = $false
+    $btnSPTManage.Enabled = $false
+    $btnSPTJsonEdit.Enabled = $false
     $rtbLog.Clear()
 
     try {
@@ -2834,6 +3936,10 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
         $btnSPImport.Enabled = $true
         $btnSPManage.Enabled = $true
         $btnSPJsonEdit.Enabled = $true
+        $btnSPTExport.Enabled = $true
+        $btnSPTImport.Enabled = $true
+        $btnSPTManage.Enabled = $true
+        $btnSPTJsonEdit.Enabled = $true
     }
 })
 
@@ -2965,6 +4071,10 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
         $form.Cursor = [System.Windows.Forms.Cursors]::Default
         $btnSPImport.Enabled = $true
         $btnSPJsonEdit.Enabled = $true
+        $btnSPTExport.Enabled = $true
+        $btnSPTImport.Enabled = $true
+        $btnSPTManage.Enabled = $true
+        $btnSPTJsonEdit.Enabled = $true
     }
 })
 
@@ -3048,6 +4158,343 @@ $btnSPManage.Add_Click({
         $form.Cursor = [System.Windows.Forms.Cursors]::Default
 
         Show-ServerProfileManageDialog -Session $session -Hostname $hostname
+    }
+    catch {
+        Write-GUILog "Fehler: $_" -Color ([System.Drawing.Color]::Red)
+        [System.Windows.Forms.MessageBox]::Show(
+            "Verbindung fehlgeschlagen:`n$_",
+            "Fehler",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        ) | Out-Null
+    }
+    finally {
+        if ($session) { Disconnect-OneViewAPIInline -Session $session }
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+    }
+})
+
+# ============================================================================
+#  Button-Event: Server Profile Template exportieren (Multi-Appliance)
+# ============================================================================
+$btnSPTExport.Add_Click({
+    if (-not (Test-InputValid)) { return }
+
+    if (-not $appliances -or $appliances.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Keine Appliances in der Appliances.txt gefunden.",
+            "Keine Appliances",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $selectedAppliances = Show-ApplianceSelectionDialog -Appliances $appliances -Title "SPT Export – Appliances auswählen"
+    if (-not $selectedAppliances -or $selectedAppliances.Count -eq 0) { return }
+
+    $applianceList = $selectedAppliances -join "`n"
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        "Server Profile Templates von $($selectedAppliances.Count) Appliance(s) exportieren?`n`n$applianceList",
+        "SPT Export bestätigen",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+
+    $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+    $btnSPTExport.Enabled = $false
+    $btnSPTImport.Enabled = $false
+    $btnSPTManage.Enabled = $false
+    $btnSPTJsonEdit.Enabled = $false
+    $rtbLog.Clear()
+
+    try {
+        $backupDir = Join-Path $scriptDir "Backups" ("SPT_" + (Get-Date -Format "yyyyMMdd_HHmmss"))
+        New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
+        Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+
+        $logsDir = Join-Path $scriptDir "Logs"
+        if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
+        $sharedLogPath = Join-Path $logsDir ("SPT_Export_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
+
+        $successCount = 0
+        $errorCount = 0
+
+        foreach ($applianceHost in $selectedAppliances) {
+            Write-GUILog "Starte SPT Export von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
+
+            $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
+            $exportPath = Join-Path $backupDir $safeName
+            New-Item -Path $exportPath -ItemType Directory -Force | Out-Null
+
+            $tempConfig = New-TempConfig -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
+
+            try {
+                $exportScript = Join-Path $scriptDir "Export-ServerProfileTemplates.ps1"
+                $psCommand = @"
+`$env:OV_USERNAME = '$($txtUser.Text)'
+`$env:OV_PASSWORD = '$($txtPass.Text -replace "'", "''")'
+`$secPass = ConvertTo-SecureString `$env:OV_PASSWORD -AsPlainText -Force
+`$global:guiCredential = New-Object System.Management.Automation.PSCredential(`$env:OV_USERNAME, `$secPass)
+function Get-Credential { param([string]`$Message) return `$global:guiCredential }
+& '$exportScript' -ConfigPath '$tempConfig' -OutputPath '$exportPath' -LogPath '$sharedLogPath'
+"@
+                $exitCode = Invoke-SubprocessWithLiveOutput -Command $psCommand
+
+                if ($exitCode -eq 0) {
+                    Write-GUILog "SPT Export erfolgreich: $applianceHost" -Color ([System.Drawing.Color]::FromArgb(80, 220, 80))
+                    $successCount++
+                } else {
+                    Write-GUILog "SPT Export fehlgeschlagen: $applianceHost" -Color ([System.Drawing.Color]::FromArgb(255, 80, 80))
+                    $errorCount++
+                }
+            }
+            catch {
+                Write-GUILog "Fehler bei $applianceHost : $_" -Color ([System.Drawing.Color]::Red)
+                $errorCount++
+            }
+            finally {
+                Remove-Item -Path $tempConfig -Force -ErrorAction SilentlyContinue
+            }
+
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+
+        Write-GUILog "" -Color ([System.Drawing.Color]::Cyan)
+        Write-GUILog "SPT Export abgeschlossen: $successCount erfolgreich, $errorCount fehlgeschlagen" -Color ([System.Drawing.Color]::Cyan)
+        Write-GUILog "Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+
+        [System.Windows.Forms.MessageBox]::Show(
+            "Server Profile Template Export abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupDir",
+            "SPT Export Ergebnis",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        ) | Out-Null
+    }
+    catch {
+        Write-GUILog "Fehler: $_" -Color ([System.Drawing.Color]::Red)
+    }
+    finally {
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+        $btnSPTExport.Enabled = $true
+        $btnSPTImport.Enabled = $true
+        $btnSPTManage.Enabled = $true
+        $btnSPTJsonEdit.Enabled = $true
+    }
+})
+
+# ============================================================================
+#  Button-Event: Server Profile Template importieren (Einzelne Appliance)
+# ============================================================================
+$btnSPTImport.Add_Click({
+    if (-not (Test-InputValid)) { return }
+
+    if (-not $appliances -or $appliances.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Keine Appliances in der Appliances.txt gefunden.",
+            "Keine Appliances",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $hostname = Show-SingleApplianceSelectionDialog -Appliances $appliances -Title "SPT Import – Appliance auswählen"
+    if (-not $hostname) { return }
+
+    # Modus auswählen
+    $modeForm = New-Object System.Windows.Forms.Form
+    $modeForm.Text = "Import-Modus wählen"
+    $modeForm.Size = New-Object System.Drawing.Size(400, 200)
+    $modeForm.StartPosition = "CenterParent"
+    $modeForm.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $modeForm.MaximizeBox = $false; $modeForm.MinimizeBox = $false
+    $modeForm.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+    $lblMode = New-Object System.Windows.Forms.Label
+    $lblMode.Text = "Wählen Sie den Import-Modus:"
+    $lblMode.Location = New-Object System.Drawing.Point(15, 15)
+    $lblMode.Size = New-Object System.Drawing.Size(360, 20)
+    $modeForm.Controls.Add($lblMode)
+
+    $cmbMode = New-Object System.Windows.Forms.ComboBox
+    $cmbMode.Location = New-Object System.Drawing.Point(15, 45)
+    $cmbMode.Size = New-Object System.Drawing.Size(350, 23)
+    $cmbMode.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
+    @("Auto (Erstellen oder Aktualisieren)", "Create (Nur neue erstellen)", "Update (Nur bestehende aktualisieren)") |
+        ForEach-Object { $cmbMode.Items.Add($_) | Out-Null }
+    $cmbMode.SelectedIndex = 0
+    $modeForm.Controls.Add($cmbMode)
+
+    $btnModeOK = New-Object System.Windows.Forms.Button
+    $btnModeOK.Text = "OK"; $btnModeOK.Location = New-Object System.Drawing.Point(200, 100)
+    $btnModeOK.Size = New-Object System.Drawing.Size(75, 28)
+    $btnModeOK.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $modeForm.AcceptButton = $btnModeOK
+    $modeForm.Controls.Add($btnModeOK)
+
+    $btnModeCancel = New-Object System.Windows.Forms.Button
+    $btnModeCancel.Text = "Abbrechen"; $btnModeCancel.Location = New-Object System.Drawing.Point(280, 100)
+    $btnModeCancel.Size = New-Object System.Drawing.Size(85, 28)
+    $btnModeCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $modeForm.CancelButton = $btnModeCancel
+    $modeForm.Controls.Add($btnModeCancel)
+
+    if ($modeForm.ShowDialog($form) -ne [System.Windows.Forms.DialogResult]::OK) {
+        $modeForm.Dispose(); return
+    }
+    $importMode = @("Auto", "Create", "Update")[$cmbMode.SelectedIndex]
+    $modeForm.Dispose()
+
+    # JSON-Datei oder Verzeichnis auswählen
+    $msgResult = [System.Windows.Forms.MessageBox]::Show(
+        "Einzelne JSON-Datei importieren?`n`nJa = Datei auswählen`nNein = Verzeichnis auswählen (mehrere Templates)",
+        "Eingabe wählen",
+        [System.Windows.Forms.MessageBoxButtons]::YesNoCancel,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+    if ($msgResult -eq [System.Windows.Forms.DialogResult]::Cancel) { return }
+
+    $inputPath = ""
+    if ($msgResult -eq [System.Windows.Forms.DialogResult]::Yes) {
+        $ofd = New-Object System.Windows.Forms.OpenFileDialog
+        $ofd.Filter = "JSON Dateien (*.json)|*.json"
+        $ofd.InitialDirectory = $scriptDir
+        $ofd.Title = "Server Profile Template JSON-Datei auswählen"
+        if ($ofd.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        $inputPath = $ofd.FileName
+    } else {
+        $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
+        $fbd.Description = "Verzeichnis mit Server Profile Template JSON-Dateien auswählen"
+        $fbd.SelectedPath = $scriptDir
+        if ($fbd.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { return }
+        $inputPath = $fbd.SelectedPath
+    }
+
+    $confirm = [System.Windows.Forms.MessageBox]::Show(
+        "Server Profile Templates importieren auf`n$hostname`n`nModus: $importMode`nQuelle: $inputPath",
+        "SPT Import bestätigen",
+        [System.Windows.Forms.MessageBoxButtons]::YesNo,
+        [System.Windows.Forms.MessageBoxIcon]::Question
+    )
+    if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+
+    $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+    $btnSPTImport.Enabled = $false
+    $rtbLog.Clear()
+
+    try {
+        Write-GUILog "Starte SPT Import auf $hostname (Modus: $importMode) ..." -Color ([System.Drawing.Color]::Cyan)
+
+        $tempConfig = New-TempConfig -Hostname $hostname -ExcelPath "" -TempDir $scriptDir
+
+        $importScript = Join-Path $scriptDir "Import-ServerProfileTemplates.ps1"
+        $escapedInputPath = $inputPath -replace "'", "''"
+        $psCommand = @"
+`$env:OV_USERNAME = '$($txtUser.Text)'
+`$env:OV_PASSWORD = '$($txtPass.Text -replace "'", "''")'
+`$secPass = ConvertTo-SecureString `$env:OV_PASSWORD -AsPlainText -Force
+`$global:guiCredential = New-Object System.Management.Automation.PSCredential(`$env:OV_USERNAME, `$secPass)
+function Get-Credential { param([string]`$Message) return `$global:guiCredential }
+& '$importScript' -ConfigPath '$tempConfig' -InputPath '$escapedInputPath' -Mode '$importMode'
+"@
+        Invoke-SubprocessWithLiveOutput -Command $psCommand | Out-Null
+
+        Write-GUILog "SPT Import abgeschlossen." -Color ([System.Drawing.Color]::Cyan)
+
+        Remove-Item -Path $tempConfig -Force -ErrorAction SilentlyContinue
+    }
+    catch {
+        Write-GUILog "Fehler: $_" -Color ([System.Drawing.Color]::Red)
+    }
+    finally {
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+        $btnSPTImport.Enabled = $true
+        $btnSPTJsonEdit.Enabled = $true
+    }
+})
+
+# ============================================================================
+#  Button-Event: Server Profile Template JSON Editor
+# ============================================================================
+$btnSPTJsonEdit.Add_Click({
+    if (-not (Test-InputValid)) { return }
+
+    if (-not $appliances -or $appliances.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Keine Appliances in der Appliances.txt gefunden.",
+            "Keine Appliances",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $hostname = Show-SingleApplianceSelectionDialog -Appliances $appliances -Title "SPT JSON Editor – Appliance auswählen"
+    if (-not $hostname) { return }
+
+    $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+    Write-GUILog "Verbinde zu $hostname für SPT JSON Editor..." -Color ([System.Drawing.Color]::Cyan)
+
+    $session = $null
+    try {
+        $apiVersion = Get-ApiVersionInline -Hostname $hostname
+        $session = Connect-OneViewAPIInline -Hostname $hostname `
+            -Username $txtUser.Text -Password $txtPass.Text -ApiVersion $apiVersion
+
+        Write-GUILog "Verbunden. Öffne JSON Editor..." -Color ([System.Drawing.Color]::FromArgb(80, 220, 80))
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+
+        Show-ServerProfileTemplateJsonEditor -Session $session -Hostname $hostname
+    }
+    catch {
+        Write-GUILog "Fehler: $_" -Color ([System.Drawing.Color]::Red)
+        [System.Windows.Forms.MessageBox]::Show(
+            "Verbindung fehlgeschlagen:`n$_",
+            "Fehler",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        ) | Out-Null
+    }
+    finally {
+        if ($session) { Disconnect-OneViewAPIInline -Session $session }
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+    }
+})
+
+# ============================================================================
+#  Button-Event: Server Profile Template verwalten (Dialog)
+# ============================================================================
+$btnSPTManage.Add_Click({
+    if (-not (Test-InputValid)) { return }
+
+    if (-not $appliances -or $appliances.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Keine Appliances in der Appliances.txt gefunden.",
+            "Keine Appliances",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    $hostname = Show-SingleApplianceSelectionDialog -Appliances $appliances -Title "SPT verwalten – Appliance auswählen"
+    if (-not $hostname) { return }
+
+    $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
+    Write-GUILog "Verbinde zu $hostname für Server Profile Template Verwaltung..." -Color ([System.Drawing.Color]::Cyan)
+
+    $session = $null
+    try {
+        $apiVersion = Get-ApiVersionInline -Hostname $hostname
+        $session = Connect-OneViewAPIInline -Hostname $hostname `
+            -Username $txtUser.Text -Password $txtPass.Text -ApiVersion $apiVersion
+
+        Write-GUILog "Verbunden. Öffne Verwaltungsdialog..." -Color ([System.Drawing.Color]::FromArgb(80, 220, 80))
+        $form.Cursor = [System.Windows.Forms.Cursors]::Default
+
+        Show-ServerProfileTemplateManageDialog -Session $session -Hostname $hostname
     }
     catch {
         Write-GUILog "Fehler: $_" -Color ([System.Drawing.Color]::Red)

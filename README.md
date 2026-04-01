@@ -1,6 +1,6 @@
 # HPE OneView Manager
 
-Grafische Oberfläche (WinForms GUI) zur Verwaltung von **Ethernet Networks**, **Network Sets** und **Server Profiles** in HPE OneView. Unterstützt mehrere Appliances gleichzeitig und verwendet ausschliesslich die **HPE OneView RESTful API** (ohne das HPE OneView PowerShell-Modul).
+Grafische Oberfläche (WinForms GUI) zur Verwaltung von **Ethernet Networks**, **Network Sets**, **Server Profiles** und **Server Profile Templates** in HPE OneView. Unterstützt mehrere Appliances gleichzeitig und verwendet ausschliesslich die **HPE OneView RESTful API** (ohne das HPE OneView PowerShell-Modul).
 
 ## Features
 
@@ -19,6 +19,10 @@ Die zentrale Anwendung bietet folgende Hauptfunktionen über Buttons:
 | **SP importieren (JSON)** | Einzelne Appliance | Importiert Server Profiles aus JSON-Dateien (Auto/Create/Update) |
 | **SP verwalten** | Einzelne Appliance | CRUD-Dialog: Profile anzeigen, erstellen, bearbeiten, löschen |
 | **SP JSON Editor** | Einzelne Appliance | Vollständiger JSON-Editor für alle Profil-Felder mit Create/Update in OneView |
+| **SPT exportieren (JSON)** | Mehrere Appliances | Exportiert alle Server Profile Templates als JSON-Dateien |
+| **SPT importieren (JSON)** | Einzelne Appliance | Importiert Server Profile Templates aus JSON-Dateien (Auto/Create/Update) |
+| **SPT verwalten** | Einzelne Appliance | CRUD-Dialog: Templates anzeigen, aus Profil erstellen, löschen, Profil erzeugen |
+| **SPT JSON Editor** | Einzelne Appliance | Vollständiger JSON-Editor für alle Template-Felder mit Create/Update in OneView |
 
 ### Appliance-Typen und Filterung
 
@@ -48,6 +52,16 @@ Appliances können in der `Appliances.txt` mit einem Typ versehen werden (z.B. E
 - **Import**: JSON-Dateien importieren mit drei Modi: Auto (erkennt automatisch), Create (nur neue), Update (nur bestehende)
 - **Verwalten**: Interaktiver Dialog mit Profil-Liste, Detail-Ansicht und Aktionen (Neu, Bearbeiten, Löschen, Exportieren)
 - **JSON Editor**: Vollzugriff auf alle Server Profile Felder (Firmware, BIOS, Connections, Storage, Boot etc.) – JSON von Datei laden, von OneView laden, editieren und als neues Profil anlegen oder bestehendes updaten
+
+### Server Profile Template Management
+
+- **Export**: Alle Server Profile Templates als einzelne JSON-Dateien exportieren (inkl. Index-Datei mit HW-Type und Enclosure Group)
+- **Import**: JSON-Dateien importieren mit drei Modi: Auto (erkennt automatisch), Create (nur neue), Update (nur bestehende)
+- **Verwalten**: Interaktiver Dialog mit Template-Liste (Name, Status, HW Type, Enclosure Group), Detail-Ansicht und Aktionen:
+  - **Aus Profil erstellen**: Neues Template basierend auf einem bestehenden Server Profile anlegen
+  - **Profil erzeugen**: Neues Server Profile aus einem ausgewählten Template erstellen (mit Hardware-Auswahl)
+  - **Löschen**, **Exportieren**, **JSON Editor** starten
+- **JSON Editor**: Vollzugriff auf alle Template-Felder – JSON von Datei laden, von OneView laden, editieren und als neues Template anlegen oder bestehendes updaten
 
 ### Multi-Deploy
 
@@ -81,6 +95,8 @@ OneView-VLAN-Manager/
 ├── Export-NetworkSets.ps1            # Network Sets nach Excel exportieren
 ├── Export-ServerProfiles.ps1         # Server Profiles als JSON exportieren
 ├── Import-ServerProfiles.ps1         # Server Profiles aus JSON importieren
+├── Export-ServerProfileTemplates.ps1  # Server Profile Templates als JSON exportieren
+├── Import-ServerProfileTemplates.ps1  # Server Profile Templates aus JSON importieren
 ├── New-ExcelTemplate.ps1             # Excel-Vorlage mit Beispieldaten generieren
 ├── config.json                       # Konfiguration (API-Version, Defaults)
 ├── Appliances.txt                    # Liste der OneView Appliances mit Typ
@@ -220,6 +236,17 @@ Die Scripts können auch direkt aufgerufen werden:
 | `POST` | `/rest/network-sets` | Neues Network Set erstellen |
 | `PUT` | `/rest/network-sets/{id}` | Network Set aktualisieren |
 | `GET` | `/rest/scopes` | Scopes abrufen |
+| `GET` | `/rest/server-profiles` | Alle Server Profiles abrufen |
+| `POST` | `/rest/server-profiles` | Neues Server Profile erstellen |
+| `PUT` | `/rest/server-profiles/{id}` | Server Profile aktualisieren |
+| `DELETE` | `/rest/server-profiles/{id}` | Server Profile löschen |
+| `GET` | `/rest/server-profile-templates` | Alle Server Profile Templates abrufen |
+| `POST` | `/rest/server-profile-templates` | Neues Template erstellen |
+| `PUT` | `/rest/server-profile-templates/{id}` | Template aktualisieren |
+| `DELETE` | `/rest/server-profile-templates/{id}` | Template löschen |
+| `GET` | `/rest/server-profile-templates/{id}/new-profile` | Profil aus Template generieren |
+| `GET` | `/rest/server-hardware-types` | Hardware-Typen abrufen |
+| `GET` | `/rest/enclosure-groups` | Enclosure Groups abrufen |
 
 ## API-Versionen (Referenz)
 
