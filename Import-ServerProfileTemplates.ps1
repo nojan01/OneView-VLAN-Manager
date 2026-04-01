@@ -242,6 +242,60 @@ if ($Mode -ne "Create") {
 }
 
 # ============================================================================
+#  Asynchrone Task-Verarbeitung
+# ============================================================================
+function Wait-OneViewTask {
+    param(
+        [Parameter(Mandatory)][string]$TaskUri,
+        [int]$TimeoutSeconds = 300,
+        [int]$PollingIntervalMs = 2000
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $uri = "$baseUri$TaskUri"
+
+    while ((Get-Date) -lt $deadline) {
+        $task = Invoke-RestMethod -Uri $uri -Method Get -Headers $authHeaders -SkipCertificateCheck
+
+        switch ($task.taskState) {
+            "Completed" {
+                $resourceUri = $task.associatedResource.resourceUri
+                if (-not [string]::IsNullOrWhiteSpace($resourceUri)) {
+                    Write-Log "  Task abgeschlossen – Ressource: $resourceUri" "SUCCESS"
+                } else {
+                    Write-Log "  Task abgeschlossen (keine Ressourcen-URI)" "SUCCESS"
+                }
+                return $task
+            }
+            { $_ -in @("Error", "Warning", "Terminated", "Killed") } {
+                $errMsg = if ($task.taskErrors) { ($task.taskErrors | ForEach-Object { $_.message }) -join "; " } else { $task.taskState }
+                throw "OneView Task fehlgeschlagen ($($task.taskState)): $errMsg"
+            }
+        }
+
+        Start-Sleep -Milliseconds $PollingIntervalMs
+    }
+
+    throw "Timeout: OneView Task '$TaskUri' nach $TimeoutSeconds Sekunden nicht abgeschlossen."
+}
+
+function Wait-ForTaskResponse {
+    param([object]$Response, [string]$ResourceName)
+
+    if (-not $Response) { return }
+
+    $taskUri = $null
+    if ($Response.type -like "*Task*")          { $taskUri = $Response.uri }
+    elseif ($Response.uri -like "/rest/tasks/*") { $taskUri = $Response.uri }
+    elseif ($Response.taskUri)                   { $taskUri = $Response.taskUri }
+
+    if ($taskUri) {
+        Write-Log "  Asynchrone Verarbeitung erkannt (Task: $taskUri) – warte auf Abschluss..." "INFO"
+        Wait-OneViewTask -TaskUri $taskUri
+    }
+}
+
+# ============================================================================
 #  Schreibgeschützte Felder für Neuerstellung entfernen
 # ============================================================================
 function Remove-ReadOnlyFields {
@@ -304,8 +358,12 @@ foreach ($item in $templatesToImport) {
             $response = Invoke-RestMethod -Uri $updateUri -Method Put `
                 -Headers $authHeaders -Body $body -SkipCertificateCheck
 
+            Wait-ForTaskResponse -Response $response -ResourceName $templateName
             Write-Log "  Template aktualisiert: $templateName" "SUCCESS"
             $successCount++
+
+            # Wartezeit damit OneView die Änderung vollständig verarbeitet
+            Start-Sleep -Milliseconds 2000
         } else {
             # ── Create (POST) ──
             Write-Log "  Erstelle neues Template: $templateName"
@@ -316,8 +374,12 @@ foreach ($item in $templatesToImport) {
             $response = Invoke-RestMethod -Uri "$baseUri/rest/server-profile-templates" `
                 -Method Post -Headers $authHeaders -Body $body -SkipCertificateCheck
 
+            Wait-ForTaskResponse -Response $response -ResourceName $templateName
             Write-Log "  Template erstellt: $templateName" "SUCCESS"
             $successCount++
+
+            # Wartezeit damit OneView das neue Template indexiert
+            Start-Sleep -Milliseconds 2000
         }
     } catch {
         Write-Log "  Fehler bei $templateName : $_" "ERROR"
