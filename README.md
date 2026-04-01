@@ -1,51 +1,127 @@
-# HPE OneView – Ethernet Networks aus Excel erstellen
+# HPE OneView Manager
 
-Dieses Projekt erstellt **Ethernet Networks** in HPE OneView basierend auf einer Excel-Datei. Es verwendet ausschliesslich die **HPE OneView RESTful API** (ohne das HPE OneView PowerShell-Modul).
+Grafische Oberfläche (WinForms GUI) zur Verwaltung von **Ethernet Networks**, **Network Sets** und **Server Profiles** in HPE OneView. Unterstützt mehrere Appliances gleichzeitig und verwendet ausschliesslich die **HPE OneView RESTful API** (ohne das HPE OneView PowerShell-Modul).
+
+## Features
+
+### GUI (OneView-Manager-GUI.ps1)
+
+Die zentrale Anwendung bietet folgende Hauptfunktionen über Buttons:
+
+| Button | Funktion | Beschreibung |
+|---|---|---|
+| **Netzwerk erstellen (Import)** | Einzelne Appliance | Erstellt/aktualisiert Ethernet Networks aus einer Excel-Datei auf einer ausgewählten Appliance |
+| **VLAN Backup (Multi)** | Mehrere Appliances | Exportiert alle Ethernet Networks von mehreren Appliances gleichzeitig als Excel-Dateien |
+| **Netzwerk erstellen (Multi)** | Mehrere Appliances | Erstellt ein einzelnes Netzwerk auf mehreren Appliances mit optionaler Network Set Zuweisung |
+| **Network Sets importieren** | Einzelne Appliance | Erstellt/aktualisiert Network Sets aus einer Excel-Datei auf einer ausgewählten Appliance |
+| **Network Set Backup (Multi)** | Mehrere Appliances | Exportiert alle Network Sets von mehreren Appliances gleichzeitig als Excel-Dateien |
+| **SP exportieren (JSON)** | Mehrere Appliances | Exportiert alle Server Profiles als JSON-Dateien |
+| **SP importieren (JSON)** | Einzelne Appliance | Importiert Server Profiles aus JSON-Dateien (Auto/Create/Update) |
+| **SP verwalten** | Einzelne Appliance | CRUD-Dialog: Profile anzeigen, erstellen, bearbeiten, löschen |
+| **SP JSON Editor** | Einzelne Appliance | Vollständiger JSON-Editor für alle Profil-Felder mit Create/Update in OneView |
+
+### Appliance-Typen und Filterung
+
+Appliances können in der `Appliances.txt` mit einem Typ versehen werden (z.B. ESXi, VDI), um verschiedene Synergy Frames zu unterscheiden. Der Appliance-Auswahldialog zeigt den Typ in Klammern an und bietet dynamische Filter-Buttons:
+
+- **Alle auswählen** / **Keine auswählen** – Standard-Auswahl
+- **Alle ESXi** / **Alle VDI** – Filtert nach Typ (Buttons werden automatisch aus den vorhandenen Typen generiert)
+
+### Ethernet Network Management
+
+- **Import aus Excel**: Netzwerke werden aus einer Excel-Datei gelesen und auf der Appliance erstellt
+- **Update bestehender Netzwerke**: Bereits existierende Netzwerke werden erkannt und bei Abweichungen aktualisiert (Purpose, SmartLink, PrivateNetwork, Bandwidth, Scope, Network Set)
+- **Duplikatserkennung**: Netzwerke mit gleichem Namen und VLAN-ID werden übersprungen, wenn keine Änderungen nötig sind
+- **Bandwidth-Konfiguration**: Preferred und Maximum Bandwidth werden über Connection Templates gesetzt
+- **Scope-Unterstützung**: Netzwerke können Scopes zugewiesen werden
+- **Network Set Zuweisung**: Netzwerke können beim Import direkt Network Sets zugewiesen werden
+
+### Network Set Management
+
+- **Import aus Excel**: Network Sets werden mit zugehörigen Netzwerken aus einer Excel-Datei erstellt
+- **Update bestehender Network Sets**: Änderungen an Netzwerkzuweisungen und Bandwidth werden erkannt und aktualisiert
+- **Backup**: Export aller Network Sets inkl. zugeordneter Netzwerke als Excel-Datei
+
+### Server Profile Management
+
+- **Export**: Alle Server Profiles als einzelne JSON-Dateien exportieren (inkl. Index-Datei)
+- **Import**: JSON-Dateien importieren mit drei Modi: Auto (erkennt automatisch), Create (nur neue), Update (nur bestehende)
+- **Verwalten**: Interaktiver Dialog mit Profil-Liste, Detail-Ansicht und Aktionen (Neu, Bearbeiten, Löschen, Exportieren)
+- **JSON Editor**: Vollzugriff auf alle Server Profile Felder (Firmware, BIOS, Connections, Storage, Boot etc.) – JSON von Datei laden, von OneView laden, editieren und als neues Profil anlegen oder bestehendes updaten
+
+### Multi-Deploy
+
+Erstellt ein einzelnes Netzwerk auf mehreren Appliances gleichzeitig:
+
+1. Netzwerk-Parameter eingeben (Name, VLAN-ID, Typ, Purpose, Bandwidth usw.)
+2. Ziel-Appliances auswählen (mit Typ-Filter)
+3. Optional: Network Sets pro Appliance zuweisen (TreeView-Dialog)
+4. Bestätigung und automatisches Deployment auf alle ausgewählten Appliances
+
+### API-Version Auto-Detection
+
+Die API-Version wird automatisch pro Appliance über `GET /rest/version` erkannt. Ein Fallback auf den in der `config.json` konfigurierten Wert ist vorhanden.
+
+### Konsolidierte Logs
+
+Bei Multi-Appliance-Operationen (Backup, Multi-Deploy) wird ein einzelnes Log pro Vorgang geschrieben, statt ein separates Log pro Appliance. Die Logdateien werden im Unterverzeichnis `Logs/` abgelegt.
+
+### Live-Output
+
+Die GUI bleibt während langer Operationen (z.B. Import von 250+ Netzwerken) responsiv. Die Ausgabe der Subprozesse wird zeilenweise in das Protokollfenster geschrieben.
 
 ## Projektstruktur
 
 ```
-OneView_VLAN_Projekt/
-├── Create-EthernetNetworks.ps1   # Hauptskript – erstellt die Ethernet Networks
-├── New-ExcelTemplate.ps1         # Hilfsskript – erzeugt eine Excel-Vorlage
-├── config.json                   # Konfigurationsdatei (Appliances, API-Version, Pfade)
-├── VLANs.xlsx                    # Excel-Datei mit VLAN-Definitionen (wird generiert)
-└── README.md                     # Diese Datei
+OneView-VLAN-Manager/
+├── OneView-Manager-GUI.ps1            # Haupt-GUI (WinForms)
+├── Create-EthernetNetworks.ps1       # Ethernet Networks erstellen/aktualisieren
+├── Create-NetworkSets.ps1            # Network Sets erstellen/aktualisieren
+├── Export-EthernetNetworks.ps1       # Ethernet Networks nach Excel exportieren
+├── Export-NetworkSets.ps1            # Network Sets nach Excel exportieren
+├── Export-ServerProfiles.ps1         # Server Profiles als JSON exportieren
+├── Import-ServerProfiles.ps1         # Server Profiles aus JSON importieren
+├── New-ExcelTemplate.ps1             # Excel-Vorlage mit Beispieldaten generieren
+├── config.json                       # Konfiguration (API-Version, Defaults)
+├── Appliances.txt                    # Liste der OneView Appliances mit Typ
+└── README.md                         # Diese Datei
 ```
 
 ## Voraussetzungen
 
 | Komponente | Mindestversion |
 |---|---|
-| PowerShell | 7.x |
-| Modul `ImportExcel` | aktuell |
+| PowerShell | 7.x (Windows) |
+| Modul `ImportExcel` | aktuell (wird bei Bedarf automatisch installiert) |
 | HPE OneView Appliance | API Version 5600+ (OneView 8.50+) |
 
-Das Modul `ImportExcel` wird bei Bedarf automatisch installiert.
+## Einrichtung
 
-## Schnellstart
+### 1. Appliances konfigurieren
 
-### 1. Excel-Vorlage erzeugen (optional)
+Bearbeiten Sie die Datei `Appliances.txt` – eine Appliance pro Zeile im Format `Hostname ; Typ`:
 
-```powershell
-.\New-ExcelTemplate.ps1
+```
+# Zeilen mit # werden ignoriert
+# Format: Hostname ; Typ (z.B. ESXi, VDI)
+oneview01.domain.local ; ESXi
+oneview02.domain.local ; ESXi
+oneview03.domain.local ; VDI
+oneview04.domain.local ; VDI
 ```
 
-Erstellt eine `VLANs.xlsx` mit Beispieldaten und allen erforderlichen Spalten.
+Der Typ ist optional. Zeilen ohne Semikolon werden als Appliance ohne Typ behandelt:
 
-### 2. Konfiguration anpassen
+```
+oneview-legacy.domain.local
+```
 
-Bearbeiten Sie die Datei `config.json`:
+### 2. Konfiguration anpassen (optional)
+
+Die Datei `config.json` enthält Standardwerte für neue Netzwerke und Network Sets:
 
 ```json
 {
-    "OneViewAppliances": [
-        {
-            "Name": "OneView-Prod-01",
-            "Hostname": "oneview01.domain.local",
-            "Description": "Produktiv OneView Appliance 1"
-        }
-    ],
     "ApiVersion": 8000,
     "ExcelFilePath": ".\\VLANs.xlsx",
     "ExcelSheetName": "VLANs",
@@ -54,22 +130,39 @@ Bearbeiten Sie die Datei `config.json`:
         "SmartLink": true,
         "PrivateNetwork": false,
         "EthernetNetworkType": "Tagged",
-        "BandwidthTypicalMbps": 2500,
-        "BandwidthMaximumMbps": 10000
+        "PreferredBandwidthGb": 2.5,
+        "MaximumBandwidthGb": 50
+    },
+    "NetworkSetExcelFilePath": ".\\NetworkSets.xlsx",
+    "NetworkSetExcelSheetName": "NetworkSets",
+    "NetworkSetDefaultSettings": {
+        "PreferredBandwidthGb": 2.5,
+        "MaximumBandwidthGb": 20
     }
 }
 ```
 
-**Wichtige Einstellungen:**
+Die `ApiVersion` dient als Fallback, falls die automatische Erkennung fehlschlägt.
 
-- **OneViewAppliances** – Eine oder mehrere Appliances (alle werden nacheinander abgearbeitet)
-- **ApiVersion** – Die API-Version Ihrer OneView-Installation (siehe Tabelle unten)
-- **ExcelFilePath** – Pfad zur Excel-Datei (relativ oder absolut)
-- **DefaultSettings** – Standardwerte, falls eine Spalte in der Excel-Datei leer ist
+### 3. GUI starten
 
-### 3. Excel-Datei befüllen
+```powershell
+.\OneView-Manager-GUI.ps1
+```
 
-Die Excel-Datei benötigt folgende Spalten:
+Benutzername und Kennwort werden in der GUI eingegeben und sicher an die Subprozesse übergeben.
+
+### 4. Excel-Vorlage erzeugen (optional)
+
+```powershell
+.\New-ExcelTemplate.ps1
+```
+
+Erstellt eine `VLANs.xlsx` mit Beispieldaten und allen erforderlichen Spalten.
+
+## Excel-Format
+
+### Ethernet Networks (VLANs.xlsx)
 
 | Spalte | Pflicht | Beschreibung | Gültige Werte |
 |---|---|---|---|
@@ -79,58 +172,54 @@ Die Excel-Datei benötigt folgende Spalten:
 | `EthernetNetworkType` | ❌ | Netzwerktyp | `Tagged`, `Untagged`, `Tunnel` |
 | `SmartLink` | ❌ | SmartLink aktivieren | `True` / `False` |
 | `PrivateNetwork` | ❌ | Privates Netzwerk | `True` / `False` |
-| `BandwidthTypicalMbps` | ❌ | Typische Bandbreite (Mbps) | Ganzzahl |
-| `BandwidthMaximumMbps` | ❌ | Maximale Bandbreite (Mbps) | Ganzzahl |
-| `Subnet` | ❌ | Subnetz (nur informativ) | z.B. `10.0.100.0/24` |
-| `Description` | ❌ | Beschreibung | Freitext |
+| `PreferredBandwidthGb` | ❌ | Typische Bandbreite (Gb) | Dezimalzahl (z.B. 2.5) |
+| `MaximumBandwidthGb` | ❌ | Maximale Bandbreite (Gb) | Dezimalzahl (z.B. 50) |
+| `Scope` | ❌ | Scope-Zuweisung | Freitext |
+| `NetworkSet` | ❌ | Network Set Zuweisung | Name(n), mehrere mit "; " getrennt |
 
-### 4. Skript ausführen
+### Network Sets (NetworkSets.xlsx)
+
+| Spalte | Pflicht | Beschreibung | Gültige Werte |
+|---|---|---|---|
+| `NetworkSetName` | ✅ | Name des Network Sets | Freitext |
+| `Networks` | ✅ | Zugeordnete Netzwerke | Name(n), mehrere mit "; " getrennt |
+| `PreferredBandwidthGb` | ❌ | Typische Bandbreite (Gb) | Dezimalzahl |
+| `MaximumBandwidthGb` | ❌ | Maximale Bandbreite (Gb) | Dezimalzahl |
+
+## Kommandozeilen-Nutzung (ohne GUI)
+
+Die Scripts können auch direkt aufgerufen werden:
 
 ```powershell
-# Produktiv-Lauf
-.\Create-EthernetNetworks.ps1
+# Ethernet Networks erstellen
+.\Create-EthernetNetworks.ps1 -ConfigPath ".\config.json"
 
-# Simulation (keine Änderungen)
-.\Create-EthernetNetworks.ps1 -WhatIf
+# Ethernet Networks exportieren
+.\Export-EthernetNetworks.ps1 -ConfigPath ".\config.json" -OutputPath ".\Backup.xlsx"
 
-# Mit benutzerdefinierter Konfiguration
-.\Create-EthernetNetworks.ps1 -ConfigPath "C:\Config\prod-config.json"
-```
+# Network Sets erstellen
+.\Create-NetworkSets.ps1 -ConfigPath ".\config.json"
 
-## Funktionsweise
-
-```
-┌──────────────┐     ┌───────────────────┐     ┌──────────────────────┐
-│  config.json │     │    VLANs.xlsx     │     │   OneView Appliance  │
-│  (Appliance  │     │  (VLAN-Daten)     │     │                      │
-│   Settings)  │     │                   │     │  REST API:           │
-└──────┬───────┘     └────────┬──────────┘     │  POST /rest/         │
-       │                      │                │   login-sessions     │
-       ▼                      ▼                │  GET  /rest/         │
-┌──────────────────────────────────────┐       │   ethernet-networks  │
-│   Create-EthernetNetworks.ps1        │──────▶│  POST /rest/         │
-│                                      │       │   ethernet-networks  │
-│  1. Config laden                     │       │  PUT  /rest/         │
-│  2. Excel importieren & validieren   │       │   connection-        │
-│  3. Login via REST API               │       │   templates/{id}     │
-│  4. Duplikate prüfen                 │       │  DELETE /rest/       │
-│  5. Netzwerke erstellen              │       │   login-sessions     │
-│  6. Bandwidth setzen                 │       └──────────────────────┘
-│  7. Session abmelden                 │
-│  8. Protokoll speichern              │
-└──────────────────────────────────────┘
+# Network Sets exportieren
+.\Export-NetworkSets.ps1 -ConfigPath ".\config.json" -OutputPath ".\NS_Backup.xlsx"
 ```
 
 ## Verwendete API-Endpunkte
 
 | Methode | URI | Beschreibung |
 |---|---|---|
-| `POST` | `/rest/login-sessions` | Authentifizierung, gibt `sessionID` zurück |
+| `GET` | `/rest/version` | API-Version der Appliance ermitteln |
+| `POST` | `/rest/login-sessions` | Authentifizierung |
 | `DELETE` | `/rest/login-sessions` | Session abmelden |
 | `GET` | `/rest/ethernet-networks` | Alle Ethernet Networks abrufen |
 | `POST` | `/rest/ethernet-networks` | Neues Ethernet Network erstellen |
+| `PUT` | `/rest/ethernet-networks/{id}` | Ethernet Network aktualisieren |
 | `GET` | `/rest/connection-templates/{id}` | Connection Template abrufen |
-| `PUT` | `/rest/connection-templates/{id}` | Bandwidth-Einstellungen aktualisieren |
+| `PUT` | `/rest/connection-templates/{id}` | Bandwidth aktualisieren |
+| `GET` | `/rest/network-sets` | Alle Network Sets abrufen |
+| `POST` | `/rest/network-sets` | Neues Network Set erstellen |
+| `PUT` | `/rest/network-sets/{id}` | Network Set aktualisieren |
+| `GET` | `/rest/scopes` | Scopes abrufen |
 
 ## API-Versionen (Referenz)
 
@@ -143,16 +232,16 @@ Die Excel-Datei benötigt folgende Spalten:
 
 ## Sicherheitshinweise
 
-- **Zertifikate**: Das Skript verwendet `-SkipCertificateCheck` für selbst-signierte Zertifikate. In Produktionsumgebungen sollte dies durch ein gültiges Zertifikat ersetzt werden.
-- **Anmeldedaten**: Das Skript fragt Benutzername/Passwort interaktiv via `Get-Credential` ab – keine Passwörter im Klartext.
-- **Session-Management**: Die Session wird im `finally`-Block immer sauber abgemeldet.
+- **Zertifikate**: Die Scripts verwenden `-SkipCertificateCheck` für selbst-signierte Zertifikate. In Produktionsumgebungen sollte dies durch ein gültiges Zertifikat ersetzt werden.
+- **Anmeldedaten**: Benutzername und Passwort werden in der GUI eingegeben und über Umgebungsvariablen an die Subprozesse übergeben – keine Passwörter im Klartext in Dateien.
+- **Session-Management**: Sessions werden im `finally`-Block immer sauber abgemeldet.
 
 ## Fehlerbehandlung
 
-- **Duplikatserkennung**: Bereits existierende Netzwerke werden automatisch übersprungen.
+- **Duplikatserkennung**: Bereits existierende Netzwerke/Network Sets werden erkannt und bei Bedarf aktualisiert statt doppelt erstellt.
 - **Validierung**: VLAN-IDs, Purpose und EthernetNetworkType werden vor der Erstellung validiert.
-- **Protokoll**: Jede Ausführung erzeugt eine Logdatei (`VLAN_Import_YYYYMMDD_HHmmss.log`).
-- **WhatIf**: Mit `-WhatIf` kann ein Trockenlauf durchgeführt werden.
+- **Protokollierung**: Jede Operation erzeugt eine Logdatei im Verzeichnis `Logs/`. Multi-Appliance-Operationen schreiben ein konsolidiertes Log.
+- **Live-Feedback**: Die GUI zeigt den Fortschritt in Echtzeit im Protokollfenster an.
 
 ## Lizenz
 
