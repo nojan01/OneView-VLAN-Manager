@@ -247,6 +247,15 @@ function Get-AllPaginated {
         $uri = if ($response.nextPageUri) { "$($Session.BaseUri)$($response.nextPageUri)" } else { $null }
     } while ($uri)
 
+    return $allMembers
+}
+
+function Get-ExistingEthernetNetworks {
+    <#
+    .SYNOPSIS  GET /rest/ethernet-networks – alle existierenden Ethernet Networks (paginiert)
+    #>
+    param([Parameter(Mandatory)][hashtable]$Session)
+
     Write-Log "Rufe existierende Ethernet Networks ab (paginiert)..."
 
     try {
