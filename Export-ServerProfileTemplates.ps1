@@ -95,7 +95,7 @@ $apiVersion = if ($config.ApiVersion) { [int]$config.ApiVersion } else { 8000 }
 # ============================================================================
 if (-not $OutputPath) {
     $safeName = $appliance.Name -replace '[\\/:*?"<>|]', '_'
-    $OutputPath = Join-Path $PSScriptRoot ("SPT_{0}_{1}" -f $safeName, (Get-Date -Format "yyyy-MM-dd"))
+    $OutputPath = Join-Path $PSScriptRoot "Backups" $safeName "SPT" ("SPT_{0}" -f (Get-Date -Format "yyyy-MM-dd"))
 }
 if (-not (Test-Path $OutputPath)) {
     New-Item -Path $OutputPath -ItemType Directory -Force | Out-Null

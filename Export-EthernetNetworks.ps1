@@ -441,7 +441,9 @@ function Main {
             $outFile = $OutputPath
             if ([string]::IsNullOrWhiteSpace($outFile)) {
                 $safeName = $appliance.Name -replace '[\\/:*?"<>|]', '_'
-                $outFile = Join-Path $PSScriptRoot ("VLAN_{0}_{1}.xlsx" -f $safeName, (Get-Date -Format "yyyy-MM-dd"))
+                $outDir = Join-Path $PSScriptRoot "Backups" $safeName "VLAN"
+                if (-not (Test-Path $outDir)) { New-Item -Path $outDir -ItemType Directory -Force | Out-Null }
+                $outFile = Join-Path $outDir ("VLAN_{0}_{1}.xlsx" -f $safeName, (Get-Date -Format "yyyy-MM-dd"))
             }
 
             $exportData | Export-Excel -Path $outFile `

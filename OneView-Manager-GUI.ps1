@@ -3284,9 +3284,8 @@ $btnBackup.Add_Click({
     $rtbLog.Clear()
 
     try {
-        $backupDir = Join-Path $scriptDir "Backups" ("VLAN_" + (Get-Date -Format "yyyy-MM-dd_HHmmss"))
-        New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
-        Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+        $backupsRoot = Join-Path $scriptDir "Backups"
+        Write-GUILog "Backup-Verzeichnis: $backupsRoot" -Color ([System.Drawing.Color]::Cyan)
 
         $logsDir = Join-Path $scriptDir "Logs"
         if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
@@ -3299,7 +3298,9 @@ $btnBackup.Add_Click({
             Write-GUILog "Starte Backup von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
 
             $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
-            $exportPath = Join-Path $backupDir ("VLAN_${safeName}_" + (Get-Date -Format "yyyy-MM-dd") + ".xlsx")
+            $applianceDir = Join-Path $backupsRoot $safeName "VLAN"
+            New-Item -Path $applianceDir -ItemType Directory -Force | Out-Null
+            $exportPath = Join-Path $applianceDir ("VLAN_${safeName}_" + (Get-Date -Format "yyyy-MM-dd") + ".xlsx")
 
             $tempConfig = New-TempConfig -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
 
@@ -3336,10 +3337,10 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
 
         Write-GUILog "" -Color ([System.Drawing.Color]::Cyan)
         Write-GUILog "Backup abgeschlossen: $successCount erfolgreich, $errorCount fehlgeschlagen" -Color ([System.Drawing.Color]::Cyan)
-        Write-GUILog "Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+        Write-GUILog "Verzeichnis: $backupsRoot" -Color ([System.Drawing.Color]::Cyan)
 
         [System.Windows.Forms.MessageBox]::Show(
-            "Backup abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupDir",
+            "Backup abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupsRoot",
             "Backup Ergebnis",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Information
@@ -3738,9 +3739,8 @@ $btnNSBackup.Add_Click({
     $rtbLog.Clear()
 
     try {
-        $backupDir = Join-Path $scriptDir "Backups" ("NS_" + (Get-Date -Format "yyyy-MM-dd_HHmmss"))
-        New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
-        Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+        $backupsRoot = Join-Path $scriptDir "Backups"
+        Write-GUILog "Backup-Verzeichnis: $backupsRoot" -Color ([System.Drawing.Color]::Cyan)
 
         $logsDir = Join-Path $scriptDir "Logs"
         if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
@@ -3753,7 +3753,9 @@ $btnNSBackup.Add_Click({
             Write-GUILog "Starte Network Set Backup von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
 
             $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
-            $exportPath = Join-Path $backupDir ("NS_${safeName}_" + (Get-Date -Format "yyyy-MM-dd") + ".xlsx")
+            $applianceDir = Join-Path $backupsRoot $safeName "NS"
+            New-Item -Path $applianceDir -ItemType Directory -Force | Out-Null
+            $exportPath = Join-Path $applianceDir ("NS_${safeName}_" + (Get-Date -Format "yyyy-MM-dd") + ".xlsx")
 
             $tempConfig = New-TempConfigNS -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
 
@@ -3790,10 +3792,10 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
 
         Write-GUILog "" -Color ([System.Drawing.Color]::Cyan)
         Write-GUILog "Network Set Backup abgeschlossen: $successCount erfolgreich, $errorCount fehlgeschlagen" -Color ([System.Drawing.Color]::Cyan)
-        Write-GUILog "Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+        Write-GUILog "Verzeichnis: $backupsRoot" -Color ([System.Drawing.Color]::Cyan)
 
         [System.Windows.Forms.MessageBox]::Show(
-            "Network Set Backup abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupDir",
+            "Network Set Backup abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupsRoot",
             "Network Set Backup Ergebnis",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Information
@@ -3860,9 +3862,8 @@ $btnSPExport.Add_Click({
     $rtbLog.Clear()
 
     try {
-        $backupDir = Join-Path $scriptDir "Backups" ("SP_" + (Get-Date -Format "yyyy-MM-dd_HHmmss"))
-        New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
-        Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+        $backupsRoot = Join-Path $scriptDir "Backups"
+        Write-GUILog "Backup-Verzeichnis: $backupsRoot" -Color ([System.Drawing.Color]::Cyan)
 
         $logsDir = Join-Path $scriptDir "Logs"
         if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
@@ -3875,7 +3876,9 @@ $btnSPExport.Add_Click({
             Write-GUILog "Starte SP Export von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
 
             $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
-            $exportPath = Join-Path $backupDir ("SP_${safeName}_" + (Get-Date -Format "yyyy-MM-dd"))
+            $applianceDir = Join-Path $backupsRoot $safeName "SP"
+            New-Item -Path $applianceDir -ItemType Directory -Force | Out-Null
+            $exportPath = Join-Path $applianceDir ("SP_" + (Get-Date -Format "yyyy-MM-dd"))
             New-Item -Path $exportPath -ItemType Directory -Force | Out-Null
 
             $tempConfig = New-TempConfig -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
@@ -3913,10 +3916,10 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
 
         Write-GUILog "" -Color ([System.Drawing.Color]::Cyan)
         Write-GUILog "SP Export abgeschlossen: $successCount erfolgreich, $errorCount fehlgeschlagen" -Color ([System.Drawing.Color]::Cyan)
-        Write-GUILog "Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+        Write-GUILog "Verzeichnis: $backupsRoot" -Color ([System.Drawing.Color]::Cyan)
 
         [System.Windows.Forms.MessageBox]::Show(
-            "Server Profile Export abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupDir",
+            "Server Profile Export abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupsRoot",
             "SP Export Ergebnis",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Information
@@ -4205,9 +4208,8 @@ $btnSPTExport.Add_Click({
     $rtbLog.Clear()
 
     try {
-        $backupDir = Join-Path $scriptDir "Backups" ("SPT_" + (Get-Date -Format "yyyy-MM-dd_HHmmss"))
-        New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
-        Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+        $backupsRoot = Join-Path $scriptDir "Backups"
+        Write-GUILog "Backup-Verzeichnis: $backupsRoot" -Color ([System.Drawing.Color]::Cyan)
 
         $logsDir = Join-Path $scriptDir "Logs"
         if (-not (Test-Path $logsDir)) { New-Item -Path $logsDir -ItemType Directory -Force | Out-Null }
@@ -4220,7 +4222,9 @@ $btnSPTExport.Add_Click({
             Write-GUILog "Starte SPT Export von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
 
             $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
-            $exportPath = Join-Path $backupDir ("SPT_${safeName}_" + (Get-Date -Format "yyyy-MM-dd"))
+            $applianceDir = Join-Path $backupsRoot $safeName "SPT"
+            New-Item -Path $applianceDir -ItemType Directory -Force | Out-Null
+            $exportPath = Join-Path $applianceDir ("SPT_" + (Get-Date -Format "yyyy-MM-dd"))
             New-Item -Path $exportPath -ItemType Directory -Force | Out-Null
 
             $tempConfig = New-TempConfig -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
@@ -4258,10 +4262,10 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
 
         Write-GUILog "" -Color ([System.Drawing.Color]::Cyan)
         Write-GUILog "SPT Export abgeschlossen: $successCount erfolgreich, $errorCount fehlgeschlagen" -Color ([System.Drawing.Color]::Cyan)
-        Write-GUILog "Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
+        Write-GUILog "Verzeichnis: $backupsRoot" -Color ([System.Drawing.Color]::Cyan)
 
         [System.Windows.Forms.MessageBox]::Show(
-            "Server Profile Template Export abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupDir",
+            "Server Profile Template Export abgeschlossen!`n`nErfolgreich: $successCount`nFehlgeschlagen: $errorCount`n`nVerzeichnis: $backupsRoot",
             "SPT Export Ergebnis",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Information
