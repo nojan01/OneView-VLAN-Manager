@@ -439,7 +439,7 @@ function Main {
             $outFile = $OutputPath
             if ([string]::IsNullOrWhiteSpace($outFile)) {
                 $safeName = $appliance.Name -replace '[\\/:*?"<>|]', '_'
-                $outFile = Join-Path $PSScriptRoot ("OneView_NetworkSets_Export_{0}_{1}.xlsx" -f $safeName, (Get-Date -Format "yyyyMMdd_HHmmss"))
+                $outFile = Join-Path $PSScriptRoot ("NS_{0}_{1}.xlsx" -f $safeName, (Get-Date -Format "yyyy-MM-dd"))
             }
 
             $exportData | Export-Excel -Path $outFile `

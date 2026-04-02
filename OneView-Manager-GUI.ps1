@@ -3284,7 +3284,7 @@ $btnBackup.Add_Click({
     $rtbLog.Clear()
 
     try {
-        $backupDir = Join-Path $scriptDir "Backups" (Get-Date -Format "yyyyMMdd_HHmmss")
+        $backupDir = Join-Path $scriptDir "Backups" ("VLAN_" + (Get-Date -Format "yyyy-MM-dd_HHmmss"))
         New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
         Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
 
@@ -3299,7 +3299,7 @@ $btnBackup.Add_Click({
             Write-GUILog "Starte Backup von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
 
             $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
-            $exportPath = Join-Path $backupDir ("${safeName}.xlsx")
+            $exportPath = Join-Path $backupDir ("VLAN_${safeName}_" + (Get-Date -Format "yyyy-MM-dd") + ".xlsx")
 
             $tempConfig = New-TempConfig -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
 
@@ -3738,7 +3738,7 @@ $btnNSBackup.Add_Click({
     $rtbLog.Clear()
 
     try {
-        $backupDir = Join-Path $scriptDir "Backups" (Get-Date -Format "yyyyMMdd_HHmmss")
+        $backupDir = Join-Path $scriptDir "Backups" ("NS_" + (Get-Date -Format "yyyy-MM-dd_HHmmss"))
         New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
         Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
 
@@ -3753,7 +3753,7 @@ $btnNSBackup.Add_Click({
             Write-GUILog "Starte Network Set Backup von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
 
             $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
-            $exportPath = Join-Path $backupDir ("NetworkSets_${safeName}.xlsx")
+            $exportPath = Join-Path $backupDir ("NS_${safeName}_" + (Get-Date -Format "yyyy-MM-dd") + ".xlsx")
 
             $tempConfig = New-TempConfigNS -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
 
@@ -3860,7 +3860,7 @@ $btnSPExport.Add_Click({
     $rtbLog.Clear()
 
     try {
-        $backupDir = Join-Path $scriptDir "Backups" ("SP_" + (Get-Date -Format "yyyyMMdd_HHmmss"))
+        $backupDir = Join-Path $scriptDir "Backups" ("SP_" + (Get-Date -Format "yyyy-MM-dd_HHmmss"))
         New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
         Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
 
@@ -3875,7 +3875,7 @@ $btnSPExport.Add_Click({
             Write-GUILog "Starte SP Export von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
 
             $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
-            $exportPath = Join-Path $backupDir $safeName
+            $exportPath = Join-Path $backupDir ("SP_${safeName}_" + (Get-Date -Format "yyyy-MM-dd"))
             New-Item -Path $exportPath -ItemType Directory -Force | Out-Null
 
             $tempConfig = New-TempConfig -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
@@ -4205,7 +4205,7 @@ $btnSPTExport.Add_Click({
     $rtbLog.Clear()
 
     try {
-        $backupDir = Join-Path $scriptDir "Backups" ("SPT_" + (Get-Date -Format "yyyyMMdd_HHmmss"))
+        $backupDir = Join-Path $scriptDir "Backups" ("SPT_" + (Get-Date -Format "yyyy-MM-dd_HHmmss"))
         New-Item -Path $backupDir -ItemType Directory -Force | Out-Null
         Write-GUILog "Backup-Verzeichnis: $backupDir" -Color ([System.Drawing.Color]::Cyan)
 
@@ -4220,7 +4220,7 @@ $btnSPTExport.Add_Click({
             Write-GUILog "Starte SPT Export von $applianceHost ..." -Color ([System.Drawing.Color]::Cyan)
 
             $safeName = $applianceHost -replace '[\\/:*?\"<>|\.]', '_'
-            $exportPath = Join-Path $backupDir $safeName
+            $exportPath = Join-Path $backupDir ("SPT_${safeName}_" + (Get-Date -Format "yyyy-MM-dd"))
             New-Item -Path $exportPath -ItemType Directory -Force | Out-Null
 
             $tempConfig = New-TempConfig -Hostname $applianceHost -ExcelPath "" -TempDir $scriptDir
