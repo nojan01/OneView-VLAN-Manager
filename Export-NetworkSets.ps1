@@ -423,6 +423,7 @@ function Main {
 
                 $exportData.Add([PSCustomObject]@{
                     NetworkSetName       = $ns.name
+                    NetworkSetType       = if ($ns.networkSetType) { $ns.networkSetType } else { "Regular" }
                     Networks             = $networksStr
                     NativeNetwork        = $nativeNetworkName
                     PreferredBandwidthGb = $bwPreferred

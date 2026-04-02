@@ -291,6 +291,7 @@ function New-NetworkSet {
         type            = "network-setV5"
         name            = $SetDefinition.Name
         networkUris     = @($SetDefinition.NetworkUris)
+        networkSetType  = $SetDefinition.NetworkSetType
     }
 
     if (-not [string]::IsNullOrWhiteSpace($SetDefinition.NativeNetworkUri)) {
@@ -438,6 +439,13 @@ function Update-NetworkSet {
         $changes += "Description: '$existingDesc' -> '$desiredDesc'"
     }
 
+    # Vergleich networkSetType
+    $existingType = if ($ExistingSet.networkSetType) { $ExistingSet.networkSetType } else { "Regular" }
+    $desiredType  = if ($SetDefinition.NetworkSetType) { $SetDefinition.NetworkSetType } else { "Regular" }
+    if ($existingType -ne $desiredType) {
+        $changes += "NetworkSetType: '$existingType' -> '$desiredType'"
+    }
+
     if ($changes.Count -eq 0) {
         Write-Log "  KEINE ÄNDERUNG: '$($SetDefinition.Name)' ist bereits aktuell." -Level INFO
         return $false
@@ -467,6 +475,9 @@ function Update-NetworkSet {
     else {
         $updateBody.description = ""
     }
+
+    # NetworkSetType aktualisieren
+    $updateBody.networkSetType = if ($SetDefinition.NetworkSetType) { $SetDefinition.NetworkSetType } else { "Regular" }
 
     $jsonBody = $updateBody | ConvertTo-Json -Depth 10
 
@@ -684,6 +695,11 @@ function Import-NetworkSetDataFromExcel {
             $row.Description.Trim()
         } else { "" }
 
+        # NetworkSetType (Regular oder Large, Standard: Regular)
+        $networkSetType = if (-not [string]::IsNullOrWhiteSpace($row.NetworkSetType)) {
+            $row.NetworkSetType.Trim()
+        } else { "Regular" }
+
         $validSets.Add(@{
             Name                 = $row.NetworkSetName.Trim()
             NetworkNames         = $networkNames
@@ -692,6 +708,7 @@ function Import-NetworkSetDataFromExcel {
             MaximumBandwidthGb   = $bwMaximum
             Scope                = $scope
             Description          = $description
+            NetworkSetType       = $networkSetType
         })
     }
 
