@@ -1189,7 +1189,7 @@ function Show-ServerProfileManageDialog {
     $colHW.HeaderText = "Server Hardware"; $colHW.Name = "Hardware"; $colHW.FillWeight = 30
     $colTemplate = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
     $colTemplate.HeaderText = "Template"; $colTemplate.Name = "Template"; $colTemplate.FillWeight = 25
-    $dgv.Columns.AddRange(@($colName, $colStatus, $colHW, $colTemplate))
+    $dgv.Columns.AddRange([System.Windows.Forms.DataGridViewColumn[]]@($colName, $colStatus, $colHW, $colTemplate))
 
     # ── Details (rechts) ──
     $txtDetails = New-Object System.Windows.Forms.RichTextBox
@@ -2171,7 +2171,7 @@ function Show-ServerProfileTemplateManageDialog {
     $colHWType.HeaderText = "Server HW Type"; $colHWType.Name = "HWType"; $colHWType.FillWeight = 30
     $colEncGroup = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
     $colEncGroup.HeaderText = "Enclosure Group"; $colEncGroup.Name = "EncGroup"; $colEncGroup.FillWeight = 25
-    $dgv.Columns.AddRange(@($colName, $colStatus, $colHWType, $colEncGroup))
+    $dgv.Columns.AddRange([System.Windows.Forms.DataGridViewColumn[]]@($colName, $colStatus, $colHWType, $colEncGroup))
 
     # ── Details (rechts) ──
     $txtDetails = New-Object System.Windows.Forms.RichTextBox
