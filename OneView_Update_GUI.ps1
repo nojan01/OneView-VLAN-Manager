@@ -1326,7 +1326,7 @@ function Show-UnifiedGUI {
     $applianceListBox.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 
     # Appliances aus Datei laden
-    $oneviewFile = Join-Path $global:scriptFolder "oneview.txt"
+    $oneviewFile = Join-Path $global:scriptFolder "oneview_upd.txt"
     if (Test-Path $oneviewFile) {
         $instances = Get-Content -Path $oneviewFile -ErrorAction SilentlyContinue | Where-Object { $_.Trim() -ne "" }
         foreach ($inst in $instances) {

@@ -6,23 +6,6 @@
 # Skriptordner ermitteln
 $scriptFolder = $PSScriptRoot
 
-Write-Host "PowerShell-Version: $($PSVersionTable.PSVersion)"
-Write-Host "Edition: $($PSVersionTable.PSEdition)"
-
-# Prüfe ob wir in einer neuen isolierten Session sind
-if (-not $env:HPEONEVIEW_ISOLATED_SESSION) {
-    $scriptPath = $MyInvocation.MyCommand.Path
-    Write-Host "Starte Script in isolierter PowerShell Session..." -ForegroundColor Yellow
-    $psCommand = @"
-`$env:HPEONEVIEW_ISOLATED_SESSION = 'true'
-& '$scriptPath'
-"@
-    Start-Process "C:\Program Files\PowerShell\7\pwsh.exe" -ArgumentList "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $psCommand -Wait
-    exit
-}
-
-Write-Host "Script läuft in isolierter Session" -ForegroundColor Green
-
 # =============================
 # Konsolenfenster ausblenden
 # =============================
