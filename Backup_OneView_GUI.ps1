@@ -354,7 +354,7 @@ $buttonStart.Add_Click({
             foreach ($appliance in $ApplianceList) {
                 $CounterRef.Value++
                 $c = $CounterRef.Value
-                $Form.BeginInvoke([action]{
+                $Form.Invoke([action]{
                     $LogBox.AppendText("Verarbeite Appliance: ${appliance} ($c von $TotalAll)`r`n")
                     $LogBox.ScrollToCaret()
                     $StatusLabel.Text = "Bearbeite Appliance $c von $TotalAll"
@@ -365,7 +365,7 @@ $buttonStart.Add_Click({
                     $listItem.SubItems.Add("Start...")
                     $DetailedListView.Items.Add($listItem) | Out-Null
                     $listItem.EnsureVisible()
-                }) | Out-Null
+                })
 
                 $currentFolder = Join-Path -Path $FolderPath -ChildPath $appliance
                 if (-not (Test-Path $currentFolder)) {
@@ -373,8 +373,9 @@ $buttonStart.Add_Click({
                         New-Item -ItemType Directory -Path $currentFolder -ErrorAction Stop | Out-Null
                     }
                     catch {
-                        $Form.BeginInvoke([action]{
-                            $LogBox.AppendText("Fehler beim Erstellen des Ordners '$currentFolder': $($_.Exception.Message)`r`n")
+                        $errMsg = $_.Exception.Message
+                        $Form.Invoke([action]{
+                            $LogBox.AppendText("Fehler beim Erstellen des Ordners '${currentFolder}': ${errMsg}`r`n")
                             $LogBox.ScrollToCaret()
                             $item = $DetailedListView.Items[$appliance]
                             if ($item -ne $null) {
@@ -382,16 +383,16 @@ $buttonStart.Add_Click({
                                 $item.SubItems[3].Text = "Ordner konnte nicht erstellt werden."
                                 $item.EnsureVisible()
                             }
-                        }) | Out-Null
+                        })
                         continue
                     }
                 }
                 Set-Location -Path $currentFolder
 
-                $Form.BeginInvoke([action]{
+                $Form.Invoke([action]{
                     $LogBox.AppendText("Verbinde zu Appliance: ${appliance}`r`n")
                     $LogBox.ScrollToCaret()
-                }) | Out-Null
+                })
 
                 try {
                     Connect-OVMgmt -Hostname $appliance -Credential $Credential -ErrorAction Stop
@@ -405,7 +406,7 @@ $buttonStart.Add_Click({
                     }
                     Disconnect-OVMgmt
 
-                    $Form.BeginInvoke([action]{
+                    $Form.Invoke([action]{
                         $LogBox.AppendText("Backup von Appliance ${appliance} wurde erfolgreich erstellt.`r`n")
                         $LogBox.ScrollToCaret()
                         $item = $DetailedListView.Items[$appliance]
@@ -414,20 +415,21 @@ $buttonStart.Add_Click({
                             $item.SubItems[3].Text = "Backup erstellt."
                             $item.EnsureVisible()
                         }
-                    }) | Out-Null
+                    })
                 }
                 catch {
-                    $Form.BeginInvoke([action]{
-                        $LogBox.AppendText("Fehler bei Appliance ${appliance}: $($_.Exception.Message)`r`n")
+                    $errMsg = $_.Exception.Message
+                    $Form.Invoke([action]{
+                        $LogBox.AppendText("Fehler bei Appliance ${appliance}: ${errMsg}`r`n")
                         $LogBox.ScrollToCaret()
                         $item = $DetailedListView.Items[$appliance]
                         if ($item -ne $null) {
                             $item.SubItems[2].Text = "Fehler"
-                            $item.SubItems[3].Text = "$($_.Exception.Message)"
+                            $item.SubItems[3].Text = $errMsg
                             $item.EnsureVisible()
                         }
-                    }) | Out-Null
-                    ("$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Fehler bei Appliance ${appliance}: $($_.Exception.Message)") |
+                    })
+                    ("$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Fehler bei Appliance ${appliance}: ${errMsg}") |
                         Out-File -Append -FilePath (Join-Path -Path $BaseBackupDir -ChildPath "Error_Log_${Date}.txt")
                     continue
                 }
