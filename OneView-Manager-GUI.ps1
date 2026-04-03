@@ -202,6 +202,17 @@ $btnNSBackup.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnNSBackup.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblActions.Controls.Add($btnNSBackup, 1, 1)
 
+# Button: Update Tool
+$btnUpdate = New-Object System.Windows.Forms.Button
+$btnUpdate.Text = "Appliance Update"
+$btnUpdate.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnUpdate.Margin = New-Object System.Windows.Forms.Padding(3, 3, 0, 0)
+$btnUpdate.BackColor = [System.Drawing.Color]::FromArgb(200, 80, 0)
+$btnUpdate.ForeColor = [System.Drawing.Color]::White
+$btnUpdate.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnUpdate.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblActions.Controls.Add($btnUpdate, 2, 1)
+
 # ============================================================================
 #  GroupBox: Server Profiles
 # ============================================================================
@@ -3820,6 +3831,24 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
         $btnSPTManage.Enabled = $true
         $btnSPTJsonEdit.Enabled = $true
     }
+})
+
+# ============================================================================
+#  Button-Event: Appliance Update (eigenständiges Tool)
+# ============================================================================
+$btnUpdate.Add_Click({
+    $updateScript = Join-Path $scriptDir "OneView_Update_GUI.ps1"
+    if (-not (Test-Path $updateScript)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Update-Script nicht gefunden:`n$updateScript",
+            "Datei fehlt",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+    Write-GUILog "Starte Appliance Update Tool…" -Color ([System.Drawing.Color]::Orange)
+    Start-Process pwsh -ArgumentList "-NoProfile -File `"$updateScript`""
 })
 
 # ============================================================================
