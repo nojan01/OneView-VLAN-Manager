@@ -129,22 +129,23 @@ $appliances = Get-AppliancesFromFile -FilePath $appliancesFile
 $grpActions = New-Object System.Windows.Forms.GroupBox
 $grpActions.Text = "Aktionen"
 $grpActions.Location = New-Object System.Drawing.Point(15, 150)
-$grpActions.Size = New-Object System.Drawing.Size(770, 130)
+$grpActions.Size = New-Object System.Drawing.Size(770, 175)
 $grpActions.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 $form.Controls.Add($grpActions)
 
 # TableLayoutPanel für gleichmässige Button-Verteilung (1x3)
 $tblActions = New-Object System.Windows.Forms.TableLayoutPanel
 $tblActions.Location = New-Object System.Drawing.Point(10, 22)
-$tblActions.Size = New-Object System.Drawing.Size(748, 96)
+$tblActions.Size = New-Object System.Drawing.Size(748, 140)
 $tblActions.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 $tblActions.ColumnCount = 3
-$tblActions.RowCount = 2
+$tblActions.RowCount = 3
 $tblActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
 $tblActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
 $tblActions.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.34))) | Out-Null
-$tblActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 50))) | Out-Null
-$tblActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 50))) | Out-Null
+$tblActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
+$tblActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
+$tblActions.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 33.34))) | Out-Null
 $grpActions.Controls.Add($tblActions)
 
 # Button: Import (Erstellen aus Excel)
@@ -213,12 +214,23 @@ $btnUpdate.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnUpdate.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblActions.Controls.Add($btnUpdate, 2, 1)
 
+# Button: Config Backup (eigenständiges Tool)
+$btnConfigBackup = New-Object System.Windows.Forms.Button
+$btnConfigBackup.Text = "Config Backup"
+$btnConfigBackup.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnConfigBackup.Margin = New-Object System.Windows.Forms.Padding(0, 3, 3, 0)
+$btnConfigBackup.BackColor = [System.Drawing.Color]::FromArgb(100, 60, 160)
+$btnConfigBackup.ForeColor = [System.Drawing.Color]::White
+$btnConfigBackup.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnConfigBackup.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblActions.Controls.Add($btnConfigBackup, 0, 2)
+
 # ============================================================================
 #  GroupBox: Server Profiles
 # ============================================================================
 $grpSP = New-Object System.Windows.Forms.GroupBox
 $grpSP.Text = "Server Profiles"
-$grpSP.Location = New-Object System.Drawing.Point(15, 295)
+$grpSP.Location = New-Object System.Drawing.Point(15, 340)
 $grpSP.Size = New-Object System.Drawing.Size(770, 80)
 $grpSP.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 $form.Controls.Add($grpSP)
@@ -285,7 +297,7 @@ $tblSP.Controls.Add($btnSPJsonEdit, 3, 0)
 # ============================================================================
 $grpSPT = New-Object System.Windows.Forms.GroupBox
 $grpSPT.Text = "Server Profile Templates"
-$grpSPT.Location = New-Object System.Drawing.Point(15, 385)
+$grpSPT.Location = New-Object System.Drawing.Point(15, 430)
 $grpSPT.Size = New-Object System.Drawing.Size(770, 80)
 $grpSPT.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 $form.Controls.Add($grpSPT)
@@ -352,7 +364,7 @@ $tblSPT.Controls.Add($btnSPTJsonEdit, 3, 0)
 # ============================================================================
 $grpLog = New-Object System.Windows.Forms.GroupBox
 $grpLog.Text = "Protokoll"
-$grpLog.Location = New-Object System.Drawing.Point(15, 480)
+$grpLog.Location = New-Object System.Drawing.Point(15, 525)
 $grpLog.Size = New-Object System.Drawing.Size(770, 440)
 $grpLog.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
 $form.Controls.Add($grpLog)
@@ -3849,6 +3861,24 @@ $btnUpdate.Add_Click({
     }
     Write-GUILog "Starte Appliance Update Tool…" -Color ([System.Drawing.Color]::Orange)
     Start-Process pwsh -ArgumentList "-NoProfile -File `"$updateScript`""
+})
+
+# ============================================================================
+#  Button-Event: Config Backup (eigenständiges Tool)
+# ============================================================================
+$btnConfigBackup.Add_Click({
+    $backupScript = Join-Path $scriptDir "Backup_OneView_GUI.ps1"
+    if (-not (Test-Path $backupScript)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Backup-Script nicht gefunden:`n$backupScript",
+            "Datei fehlt",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+    Write-GUILog "Starte Config Backup Tool…" -Color ([System.Drawing.Color]::Orange)
+    Start-Process pwsh -ArgumentList "-NoProfile -File `"$backupScript`""
 })
 
 # ============================================================================
