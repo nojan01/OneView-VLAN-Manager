@@ -1,6 +1,0 @@
-# OneView Appliances – eine Appliance pro Zeile
-# Zeilen mit # werden ignoriert
-#
-# Format: Hostname ; Typ (z.B. ESXi, VDI)
-oneview01.domain.local ; ESXi
-oneview02. ; VDI

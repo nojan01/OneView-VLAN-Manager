@@ -1,6 +1,6 @@
 # ============================================================================
 #  HPE OneView Config-Backup – Kombiniert (OV 6.60 + OV 11.10)
-#  Sequentiell: Erst alle 660er, dann Modulwechsel, dann alle 1110er
+#  Parallel: OV 660 und OV 1000 laufen in eigenen Prozessen (Start-Job)
 # ============================================================================
 
 # Skriptordner ermitteln
@@ -283,7 +283,7 @@ $buttonStart.Add_Click({
         return
     }
 
-    $scriptBlock = {
+    $orchestratorBlock = {
         param(
             [string[]]$appliances660,
             [string[]]$appliances1110,
@@ -302,14 +302,15 @@ $buttonStart.Add_Click({
         )
 
         $totalAll = $appliances660.Count + $appliances1110.Count
-        $counterAll = 0
+        $counter  = 0
 
         # -----------------------------------------------------------
-        #  Hilfsfunktion: Backup einer Appliance-Liste durchführen
+        #  Batch-ScriptBlock: Läuft als Start-Job in eigenem Prozess
+        #  (Eigener Prozess = eigenes Modul, KEIN Assembly-Konflikt)
         # -----------------------------------------------------------
-        function Invoke-BackupBatch {
+        $batchScript = {
             param(
-                [string[]]$ApplianceList,
+                [string]$ApplianceListStr,
                 [string]$ModuleName,
                 [string]$VersionLabel,
                 [System.Management.Automation.PSCredential]$Credential,
@@ -317,55 +318,33 @@ $buttonStart.Add_Click({
                 [string]$BaseBackupDir,
                 [string]$Date,
                 [string]$Passphrase,
-                [System.Windows.Forms.Form]$Form,
-                [System.Windows.Forms.RichTextBox]$LogBox,
-                [System.Windows.Forms.ListView]$DetailedListView,
-                [System.Windows.Forms.ToolStripStatusLabel]$StatusLabel,
-                [ref]$CounterRef,
-                [int]$TotalAll
+                [string]$LogFilePath
             )
 
+            # Appliance-Liste aus Trennzeichen-String rekonstruieren
+            $ApplianceList = @($ApplianceListStr -split '\|')
             if ($ApplianceList.Count -eq 0) { return }
 
-            # PSModulePath Reset für 660
-            if ($ModuleName -eq "HPEOneView.660") {
-                $machinePath = [Environment]::GetEnvironmentVariable('PSModulePath','Machine')
-                $userPath    = [Environment]::GetEnvironmentVariable('PSModulePath','User')
-                $env:PSModulePath = "$machinePath;$userPath"
-            }
+            # SSL-Zertifikatsprüfung deaktivieren (eigener Prozess erbt keine Einstellungen)
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+            try {
+                [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+            } catch {}
+            # HPE OneView Modul-eigene Zertifikatsprüfung deaktivieren
+            $Global:SetLibraryBypassCertificatePolicy = $true
 
-            # Modul laden
-            Get-Module -Name "HPEOneView*" | Remove-Module -Force -ErrorAction SilentlyContinue
+            # Modul laden (eigener Prozess = kein Konflikt mit anderem Modul)
             try {
                 Import-Module $ModuleName -Force -ErrorAction Stop
-                $Form.BeginInvoke([action]{
-                    $LogBox.AppendText("=== $ModuleName geladen – Starte Backup für $($ApplianceList.Count) Appliance(s) (OV $VersionLabel) ===`r`n")
-                    $LogBox.ScrollToCaret()
-                }) | Out-Null
+                [PSCustomObject]@{ Type='LOG'; Message="=== $ModuleName geladen – Starte Backup für $($ApplianceList.Count) Appliance(s) (OV $VersionLabel) ===" }
             }
             catch {
-                $Form.BeginInvoke([action]{
-                    $LogBox.AppendText("FEHLER: Konnte $ModuleName nicht laden: $($_.Exception.Message)`r`n")
-                    $LogBox.ScrollToCaret()
-                }) | Out-Null
+                [PSCustomObject]@{ Type='MODULE_FAIL'; Message="FEHLER: Konnte $ModuleName nicht laden: $($_.Exception.Message)"; Count=$ApplianceList.Count }
                 return
             }
 
             foreach ($appliance in $ApplianceList) {
-                $CounterRef.Value++
-                $c = $CounterRef.Value
-                $Form.Invoke([action]{
-                    $LogBox.AppendText("Verarbeite Appliance: ${appliance} ($c von $TotalAll)`r`n")
-                    $LogBox.ScrollToCaret()
-                    $StatusLabel.Text = "Bearbeite Appliance $c von $TotalAll"
-                    $listItem = New-Object System.Windows.Forms.ListViewItem($appliance)
-                    $listItem.Name = $appliance
-                    $listItem.SubItems.Add($VersionLabel)
-                    $listItem.SubItems.Add("Wird verarbeitet")
-                    $listItem.SubItems.Add("Start...")
-                    $DetailedListView.Items.Add($listItem) | Out-Null
-                    $listItem.EnsureVisible()
-                })
+                [PSCustomObject]@{ Type='PROGRESS'; Appliance=$appliance; VersionLabel=$VersionLabel }
 
                 $currentFolder = Join-Path -Path $FolderPath -ChildPath $appliance
                 if (-not (Test-Path $currentFolder)) {
@@ -373,26 +352,13 @@ $buttonStart.Add_Click({
                         New-Item -ItemType Directory -Path $currentFolder -ErrorAction Stop | Out-Null
                     }
                     catch {
-                        $errMsg = $_.Exception.Message
-                        $Form.Invoke([action]{
-                            $LogBox.AppendText("Fehler beim Erstellen des Ordners '${currentFolder}': ${errMsg}`r`n")
-                            $LogBox.ScrollToCaret()
-                            $item = $DetailedListView.Items[$appliance]
-                            if ($item -ne $null) {
-                                $item.SubItems[2].Text = "Fehler"
-                                $item.SubItems[3].Text = "Ordner konnte nicht erstellt werden."
-                                $item.EnsureVisible()
-                            }
-                        })
+                        [PSCustomObject]@{ Type='UPDATE'; Appliance=$appliance; Status='Fehler'; Detail='Ordner konnte nicht erstellt werden.' }
                         continue
                     }
                 }
                 Set-Location -Path $currentFolder
 
-                $Form.Invoke([action]{
-                    $LogBox.AppendText("Verbinde zu Appliance: ${appliance}`r`n")
-                    $LogBox.ScrollToCaret()
-                })
+                [PSCustomObject]@{ Type='LOG'; Message="Verbinde zu Appliance: $appliance" }
 
                 try {
                     Connect-OVMgmt -Hostname $appliance -Credential $Credential -ErrorAction Stop
@@ -406,29 +372,11 @@ $buttonStart.Add_Click({
                     }
                     Disconnect-OVMgmt
 
-                    $Form.Invoke([action]{
-                        $LogBox.AppendText("Backup von Appliance ${appliance} wurde erfolgreich erstellt.`r`n")
-                        $LogBox.ScrollToCaret()
-                        $item = $DetailedListView.Items[$appliance]
-                        if ($item -ne $null) {
-                            $item.SubItems[2].Text = "Erfolgreich"
-                            $item.SubItems[3].Text = "Backup erstellt."
-                            $item.EnsureVisible()
-                        }
-                    })
+                    [PSCustomObject]@{ Type='UPDATE'; Appliance=$appliance; Status='Erfolgreich'; Detail='Backup erstellt.' }
                 }
                 catch {
                     $errMsg = $_.Exception.Message
-                    $Form.Invoke([action]{
-                        $LogBox.AppendText("Fehler bei Appliance ${appliance}: ${errMsg}`r`n")
-                        $LogBox.ScrollToCaret()
-                        $item = $DetailedListView.Items[$appliance]
-                        if ($item -ne $null) {
-                            $item.SubItems[2].Text = "Fehler"
-                            $item.SubItems[3].Text = $errMsg
-                            $item.EnsureVisible()
-                        }
-                    })
+                    [PSCustomObject]@{ Type='UPDATE'; Appliance=$appliance; Status='Fehler'; Detail=$errMsg }
                     ("$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Fehler bei Appliance ${appliance}: ${errMsg}") |
                         Out-File -Append -FilePath (Join-Path -Path $BaseBackupDir -ChildPath "Error_Log_${Date}.txt")
                     continue
@@ -440,42 +388,149 @@ $buttonStart.Add_Click({
         }
 
         # -----------------------------------------------------------
-        #  Phase 1: OV 6.60 Appliances
+        #  Jobs starten (eigene Prozesse = echte Modul-Isolation)
         # -----------------------------------------------------------
-        Invoke-BackupBatch `
-            -ApplianceList $appliances660 `
-            -ModuleName "HPEOneView.660" `
-            -VersionLabel "6.60" `
-            -Credential $credential `
-            -FolderPath $folderPath `
-            -BaseBackupDir $baseBackupDir `
-            -Date $date `
-            -Passphrase $passphrase `
-            -Form $form `
-            -LogBox $logBox `
-            -DetailedListView $detailedListView `
-            -StatusLabel $statusLabel `
-            -CounterRef ([ref]$counterAll) `
-            -TotalAll $totalAll
+        $jobs = @()
+
+        # --- OV 6.60 Job ---
+        if ($appliances660.Count -gt 0) {
+            $list660Str = $appliances660 -join '|'
+            $jobs += Start-Job -Name 'OV 6.60' -ScriptBlock $batchScript -ArgumentList @(
+                $list660Str, "HPEOneView.660", "6.60",
+                $credential, $folderPath, $baseBackupDir, $date,
+                $passphrase, $logFilePath
+            )
+        }
+
+        # --- OV 11.10 Job ---
+        if ($appliances1110.Count -gt 0) {
+            $list1110Str = $appliances1110 -join '|'
+            $jobs += Start-Job -Name 'OV 11.10' -ScriptBlock $batchScript -ArgumentList @(
+                $list1110Str, "HPEOneView.1000", "11.10",
+                $credential, $folderPath, $baseBackupDir, $date,
+                $passphrase, $logFilePath
+            )
+        }
 
         # -----------------------------------------------------------
-        #  Phase 2: OV 11.10 Appliances
+        #  Jobs pollen und GUI aktualisieren
         # -----------------------------------------------------------
-        Invoke-BackupBatch `
-            -ApplianceList $appliances1110 `
-            -ModuleName "HPEOneView.1000" `
-            -VersionLabel "11.10" `
-            -Credential $credential `
-            -FolderPath $folderPath `
-            -BaseBackupDir $baseBackupDir `
-            -Date $date `
-            -Passphrase $passphrase `
-            -Form $form `
-            -LogBox $logBox `
-            -DetailedListView $detailedListView `
-            -StatusLabel $statusLabel `
-            -CounterRef ([ref]$counterAll) `
-            -TotalAll $totalAll
+        while ($jobs | Where-Object { $_.State -eq 'Running' }) {
+            foreach ($job in $jobs) {
+                # Job-Fehler anzeigen (z.B. bei Crash/Exception)
+                if ($job.State -eq 'Failed' -and $job.Name -ne $null) {
+                    $jn = $job.Name
+                    $je = $job.ChildJobs[0].JobStateInfo.Reason.Message
+                    if ($je) {
+                        $form.BeginInvoke([action]{
+                            $logBox.AppendText("FEHLER im Job $jn : $je`r`n")
+                            $logBox.ScrollToCaret()
+                        }) | Out-Null
+                    }
+                }
+                $messages = @(Receive-Job $job -ErrorAction SilentlyContinue)
+                foreach ($msg in $messages) {
+                    if ($null -eq $msg -or $null -eq $msg.Type) { continue }
+                    switch ($msg.Type) {
+                        'LOG' {
+                            $txt = $msg.Message
+                            $form.BeginInvoke([action]{
+                                $logBox.AppendText("$txt`r`n")
+                                $logBox.ScrollToCaret()
+                            }) | Out-Null
+                        }
+                        'MODULE_FAIL' {
+                            $totalAll -= $msg.Count
+                            $txt = $msg.Message
+                            $form.BeginInvoke([action]{
+                                $logBox.AppendText("$txt`r`n")
+                                $logBox.ScrollToCaret()
+                            }) | Out-Null
+                        }
+                        'PROGRESS' {
+                            $counter++
+                            $c = $counter
+                            $t = $totalAll
+                            $a = $msg.Appliance
+                            $v = $msg.VersionLabel
+                            $form.Invoke([action]{
+                                $logBox.AppendText("Verarbeite Appliance: $a ($c von $t)`r`n")
+                                $logBox.ScrollToCaret()
+                                $statusLabel.Text = "Bearbeite Appliance $c von $t"
+                                $listItem = New-Object System.Windows.Forms.ListViewItem($a)
+                                $listItem.Name = $a
+                                $listItem.SubItems.Add($v)
+                                $listItem.SubItems.Add("Wird verarbeitet")
+                                $listItem.SubItems.Add("Start...")
+                                $detailedListView.Items.Add($listItem) | Out-Null
+                                $listItem.EnsureVisible()
+                            })
+                        }
+                        'UPDATE' {
+                            $a = $msg.Appliance
+                            $s = $msg.Status
+                            $d = $msg.Detail
+                            $form.Invoke([action]{
+                                $logBox.AppendText("Appliance ${a}: $s – $d`r`n")
+                                $logBox.ScrollToCaret()
+                                $item = $detailedListView.Items[$a]
+                                if ($item -ne $null) {
+                                    $item.SubItems[2].Text = $s
+                                    $item.SubItems[3].Text = $d
+                                    $item.EnsureVisible()
+                                }
+                            })
+                        }
+                    }
+                }
+            }
+            Start-Sleep -Milliseconds 250
+        }
+
+        # --- Restliche Ausgaben einsammeln ---
+        foreach ($job in $jobs) {
+            $messages = @(Receive-Job $job -ErrorAction SilentlyContinue)
+            foreach ($msg in $messages) {
+                if ($null -eq $msg -or $null -eq $msg.Type) { continue }
+                switch ($msg.Type) {
+                    'LOG' {
+                        $txt = $msg.Message
+                        $form.BeginInvoke([action]{
+                            $logBox.AppendText("$txt`r`n")
+                            $logBox.ScrollToCaret()
+                        }) | Out-Null
+                    }
+                    'UPDATE' {
+                        $a = $msg.Appliance
+                        $s = $msg.Status
+                        $d = $msg.Detail
+                        $form.Invoke([action]{
+                            $logBox.AppendText("Appliance ${a}: $s – $d`r`n")
+                            $logBox.ScrollToCaret()
+                            $item = $detailedListView.Items[$a]
+                            if ($item -ne $null) {
+                                $item.SubItems[2].Text = $s
+                                $item.SubItems[3].Text = $d
+                                $item.EnsureVisible()
+                            }
+                        })
+                    }
+                }
+            }
+            $lbl = $job.Name
+            $je = $null
+            if ($job.State -eq 'Failed') {
+                $je = $job.ChildJobs[0].JobStateInfo.Reason.Message
+            }
+            $form.BeginInvoke([action]{
+                if ($je) {
+                    $logBox.AppendText("FEHLER im Job $lbl : $je`r`n")
+                }
+                $logBox.AppendText("--- $lbl Backup-Batch abgeschlossen ---`r`n")
+                $logBox.ScrollToCaret()
+            }) | Out-Null
+            Remove-Job $job -Force
+        }
 
         # -----------------------------------------------------------
         #  Backup-Übertragung per PSCP
@@ -604,9 +659,9 @@ $buttonStart.Add_Click({
         }) | Out-Null
     }
 
-    # Starte asynchronen Runspace
+    # Starte Orchestrator-Runspace
     $asyncPS = [powershell]::Create()
-    $asyncPS.AddScript($scriptBlock) | Out-Null
+    $asyncPS.AddScript($orchestratorBlock) | Out-Null
     $asyncPS.AddArgument($appliances660) | Out-Null
     $asyncPS.AddArgument($appliances1110) | Out-Null
     $asyncPS.AddArgument($credential) | Out-Null
