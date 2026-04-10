@@ -97,10 +97,11 @@ $tblTools = New-Object System.Windows.Forms.TableLayoutPanel
 $tblTools.Location = New-Object System.Drawing.Point(10, 22)
 $tblTools.Size = New-Object System.Drawing.Size(748, 34)
 $tblTools.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$tblTools.ColumnCount = 2
+$tblTools.ColumnCount = 3
 $tblTools.RowCount = 1
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 50))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.34))) | Out-Null
 $tblTools.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100))) | Out-Null
 $grpTools.Controls.Add($tblTools)
 
@@ -119,12 +120,23 @@ $tblTools.Controls.Add($btnUpdate, 0, 0)
 $btnConfigBackup = New-Object System.Windows.Forms.Button
 $btnConfigBackup.Text = "Config Backup"
 $btnConfigBackup.Dock = [System.Windows.Forms.DockStyle]::Fill
-$btnConfigBackup.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 0)
+$btnConfigBackup.Margin = New-Object System.Windows.Forms.Padding(3, 0, 3, 0)
 $btnConfigBackup.BackColor = [System.Drawing.Color]::FromArgb(100, 60, 160)
 $btnConfigBackup.ForeColor = [System.Drawing.Color]::White
 $btnConfigBackup.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnConfigBackup.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblTools.Controls.Add($btnConfigBackup, 1, 0)
+
+# Button: User Manager
+$btnUserManager = New-Object System.Windows.Forms.Button
+$btnUserManager.Text = "User Manager"
+$btnUserManager.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnUserManager.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 0)
+$btnUserManager.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 120)
+$btnUserManager.ForeColor = [System.Drawing.Color]::White
+$btnUserManager.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnUserManager.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblTools.Controls.Add($btnUserManager, 2, 0)
 
 # ============================================================================
 #  GroupBox: Anmeldeinformationen
@@ -3918,6 +3930,24 @@ $btnConfigBackup.Add_Click({
     }
     Write-GUILog "Starte Config Backup Tool…" -Color ([System.Drawing.Color]::Orange)
     Start-Process pwsh -ArgumentList "-NoProfile -File `"$backupScript`""
+})
+
+# ============================================================================
+#  Button-Event: User Manager (eigenständiges Tool)
+# ============================================================================
+$btnUserManager.Add_Click({
+    $userManagerScript = Join-Path $scriptDir "OneView-UserManager-GUI.ps1"
+    if (-not (Test-Path $userManagerScript)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "User-Manager-Script nicht gefunden:`n$userManagerScript",
+            "Datei fehlt",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+    Write-GUILog "Starte User Manager Tool…" -Color ([System.Drawing.Color]::Orange)
+    Start-Process pwsh -ArgumentList "-NoProfile -File `"$userManagerScript`""
 })
 
 # ============================================================================
