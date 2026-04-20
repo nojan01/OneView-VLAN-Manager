@@ -97,11 +97,12 @@ $tblTools = New-Object System.Windows.Forms.TableLayoutPanel
 $tblTools.Location = New-Object System.Drawing.Point(10, 22)
 $tblTools.Size = New-Object System.Drawing.Size(748, 34)
 $tblTools.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$tblTools.ColumnCount = 3
+$tblTools.ColumnCount = 4
 $tblTools.RowCount = 1
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.34))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25.0))) | Out-Null
 $tblTools.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100))) | Out-Null
 $grpTools.Controls.Add($tblTools)
 
@@ -131,12 +132,23 @@ $tblTools.Controls.Add($btnConfigBackup, 1, 0)
 $btnUserManager = New-Object System.Windows.Forms.Button
 $btnUserManager.Text = "User Manager"
 $btnUserManager.Dock = [System.Windows.Forms.DockStyle]::Fill
-$btnUserManager.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 0)
+$btnUserManager.Margin = New-Object System.Windows.Forms.Padding(3, 0, 3, 0)
 $btnUserManager.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 120)
 $btnUserManager.ForeColor = [System.Drawing.Color]::White
 $btnUserManager.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnUserManager.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblTools.Controls.Add($btnUserManager, 2, 0)
+
+# Button: Alerts
+$btnAlerts = New-Object System.Windows.Forms.Button
+$btnAlerts.Text = "Alerts"
+$btnAlerts.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnAlerts.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 0)
+$btnAlerts.BackColor = [System.Drawing.Color]::FromArgb(160, 40, 60)
+$btnAlerts.ForeColor = [System.Drawing.Color]::White
+$btnAlerts.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnAlerts.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblTools.Controls.Add($btnAlerts, 3, 0)
 
 # ============================================================================
 #  GroupBox: Anmeldeinformationen
@@ -1484,7 +1496,7 @@ function Show-ServerProfileEditDialog {
         if ($ExistingProfile.serverProfileTemplateUri) {
             foreach ($t in $Templates) {
                 if ($t.uri -eq $ExistingProfile.serverProfileTemplateUri) {
-                    $idx = [Array]::IndexOf($cmbTemplate.Items.Cast([string]).ToArray(), $t.name)
+                    $idx = $cmbTemplate.Items.IndexOf($t.name)
                     if ($idx -ge 0) { $cmbTemplate.SelectedIndex = $idx }
                     break
                 }
@@ -3948,6 +3960,24 @@ $btnUserManager.Add_Click({
     }
     Write-GUILog "Starte User Manager Tool…" -Color ([System.Drawing.Color]::Orange)
     Start-Process pwsh -ArgumentList "-NoProfile -File `"$userManagerScript`""
+})
+
+# ============================================================================
+#  Button-Event: Alerts (eigenständiges Tool)
+# ============================================================================
+$btnAlerts.Add_Click({
+    $alertsScript = Join-Path $scriptDir "Oneview_Alerts\Oneview_Alerts_GUI.ps1"
+    if (-not (Test-Path $alertsScript)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Alerts-Script nicht gefunden:`n$alertsScript",
+            "Datei fehlt",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+    Write-GUILog "Starte Alerts Tool…" -Color ([System.Drawing.Color]::Orange)
+    Start-Process pwsh -ArgumentList "-NoProfile -File `"$alertsScript`""
 })
 
 # ============================================================================

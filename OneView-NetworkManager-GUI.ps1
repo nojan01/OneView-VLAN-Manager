@@ -1289,7 +1289,7 @@ function Show-ServerProfileEditDialog {
         if ($ExistingProfile.serverProfileTemplateUri) {
             foreach ($t in $Templates) {
                 if ($t.uri -eq $ExistingProfile.serverProfileTemplateUri) {
-                    $idx = [Array]::IndexOf($cmbTemplate.Items.Cast([string]).ToArray(), $t.name)
+                    $idx = $cmbTemplate.Items.IndexOf($t.name)
                     if ($idx -ge 0) { $cmbTemplate.SelectedIndex = $idx }
                     break
                 }
