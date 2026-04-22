@@ -3912,7 +3912,7 @@ function Get-Credential { param([string]`$Message) return `$global:guiCredential
 #  Button-Event: Appliance Update (eigenständiges Tool)
 # ============================================================================
 $btnUpdate.Add_Click({
-    $updateScript = Join-Path $scriptDir "OneView_Update_GUI.ps1"
+    $updateScript = Join-Path $scriptDir "Oneview_Update\OneView_Update_GUI.ps1"
     if (-not (Test-Path $updateScript)) {
         [System.Windows.Forms.MessageBox]::Show(
             "Update-Script nicht gefunden:`n$updateScript",
@@ -3930,7 +3930,7 @@ $btnUpdate.Add_Click({
 #  Button-Event: Config Backup (eigenständiges Tool)
 # ============================================================================
 $btnConfigBackup.Add_Click({
-    $backupScript = Join-Path $scriptDir "Backup_OneView_GUI.ps1"
+    $backupScript = Join-Path $scriptDir "Oneview_Backup\Backup_OneView_GUI.ps1"
     if (-not (Test-Path $backupScript)) {
         [System.Windows.Forms.MessageBox]::Show(
             "Backup-Script nicht gefunden:`n$backupScript",
@@ -3948,7 +3948,7 @@ $btnConfigBackup.Add_Click({
 #  Button-Event: User Manager (eigenständiges Tool)
 # ============================================================================
 $btnUserManager.Add_Click({
-    $userManagerScript = Join-Path $scriptDir "OneView-UserManager-GUI.ps1"
+    $userManagerScript = Join-Path $scriptDir "Oneview_UserManager\OneView-UserManager-GUI.ps1"
     if (-not (Test-Path $userManagerScript)) {
         [System.Windows.Forms.MessageBox]::Show(
             "User-Manager-Script nicht gefunden:`n$userManagerScript",
