@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     Konfigurations-GUI für den geplanten Task "OneView Backup".

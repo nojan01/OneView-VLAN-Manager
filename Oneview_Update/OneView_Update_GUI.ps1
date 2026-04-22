@@ -1,4 +1,5 @@
-﻿# Global: Skriptordner ermitteln – alle relativen Pfade basieren darauf
+﻿#Requires -Version 7.0
+# Global: Skriptordner ermitteln – alle relativen Pfade basieren darauf
 $global:scriptFolder = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 

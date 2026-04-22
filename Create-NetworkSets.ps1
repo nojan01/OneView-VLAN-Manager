@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     Erstellt und aktualisiert Network Sets in HPE OneView basierend auf einer Excel-Datei.

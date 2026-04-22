@@ -1,4 +1,5 @@
-﻿# ============================================================================
+﻿#Requires -Version 7.0
+# ============================================================================
 #  HPE OneView Password Change – Kombiniert (OV 6.60 + OV 11.10)
 #  Sequentiell: Jede Appliance wird einzeln per Start-Job verarbeitet
 #  X-API-Version wird automatisch ermittelt

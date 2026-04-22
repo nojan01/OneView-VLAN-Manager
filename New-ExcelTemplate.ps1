@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     Erzeugt eine Excel-Vorlage für die VLAN-Konfiguration.

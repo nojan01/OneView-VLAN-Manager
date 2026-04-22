@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 ## Laufzeit-Prüfungen und Konsolenfenster ausblenden (nur Windows)
 if (-not $IsWindows) { Write-Error "Dieses Tool unterstützt nur Windows (Server 2022)."; return }
 

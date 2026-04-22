@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     GUI für HPE OneView Manager – Netzwerke, Network Sets & Server Profiles.

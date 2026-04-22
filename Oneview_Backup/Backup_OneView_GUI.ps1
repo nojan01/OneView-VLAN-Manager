@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 # ============================================================================
 #  HPE OneView Config-Backup – Kombiniert (OV 6.60 + OV 11.10)
 #  Parallel: OV 660 und OV 1000 laufen in eigenen Prozessen (Start-Job)

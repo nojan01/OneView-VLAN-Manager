@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 # ============================================================================
 #  HPE OneView User Manager GUI
 #  Direkte REST-API – keine HPE PowerShell-Module erforderlich

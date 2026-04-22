@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     Exportiert alle Ethernet Networks aus HPE OneView in eine Excel-Datei.

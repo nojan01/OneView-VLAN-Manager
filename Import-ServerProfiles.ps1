@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     Importiert Server Profiles in HPE OneView aus JSON-Dateien.

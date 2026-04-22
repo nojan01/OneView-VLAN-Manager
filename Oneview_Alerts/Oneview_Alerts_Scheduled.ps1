@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     Headless Runner für OneView Alerts-Abfrage (geplanter Task).
