@@ -246,10 +246,25 @@ $batchScript = {
                     if (-not $jobErr) { $jobErr = "Unbekannter Fehler im Backup-Job" }
                     throw $jobErr
                 }
-                Receive-Job $backupJob -ErrorAction SilentlyContinue | Out-Null
+                # Fehlerstream und Output einsammeln (Error-Records aus Modul-Cmdlets)
+                $jobErrors = @()
+                $null = Receive-Job $backupJob -ErrorVariable jobErrors -ErrorAction SilentlyContinue
                 Remove-Job $backupJob -Force
+                if ($jobErrors -and $jobErrors.Count -gt 0) {
+                    $errText = ($jobErrors | ForEach-Object { $_.ToString() }) -join ' | '
+                    throw "Backup-Job meldete Fehler: $errText"
+                }
 
-                [PSCustomObject]@{ Type = 'UPDATE'; Appliance = $appliance; Status = 'Erfolgreich'; Detail = "Backup erstellt (Versuch $attempt)." }
+                # Verifikation: Es muss tatsächlich eine Backup-Datei im Zielordner liegen (>0 Byte)
+                $backupFiles = @(Get-ChildItem -Path $currentFolder -File -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Extension -ne '.log' -and $_.Length -gt 0 })
+                if ($backupFiles.Count -eq 0) {
+                    throw "Backup-Job abgeschlossen, aber keine Backup-Datei im Ordner '$currentFolder' gefunden."
+                }
+                $backupFile = $backupFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                $sizeMB = [math]::Round($backupFile.Length / 1MB, 2)
+
+                [PSCustomObject]@{ Type = 'UPDATE'; Appliance = $appliance; Status = 'Erfolgreich'; Detail = "Backup erstellt: $($backupFile.Name) ($sizeMB MB, Versuch $attempt)." }
                 break
             }
             catch {
@@ -372,16 +387,32 @@ if ($config.TransferEnabled) {
                 $transferPw = $credential.GetNetworkCredential().Password
             }
 
-            $source = Join-Path $baseBackupDir '*'
-            $destination = "$($config.TransferUser)@$($config.TransferHost):$($config.TransferRemotePath)"
+            # Nur den heutigen Datumsordner übertragen (nicht das BaseDir mit Log-Dateien)
+            $source = Join-Path $baseBackupDir $date
+            if (-not (Test-Path $source -PathType Container)) {
+                throw "Quell-Ordner für Transfer nicht gefunden: $source"
+            }
+            $remotePath = ([string]$config.TransferRemotePath).TrimEnd('/')
+            $destination = "$($config.TransferUser)@$($config.TransferHost):$remotePath/"
             $pscpArgs = @('-r', '-batch', '-pw', $transferPw, $source, $destination)
-            Write-RunLog "Starte PSCP-Übertragung zu $($config.TransferHost)"
-            $p = Start-Process -FilePath $pscpExe -ArgumentList $pscpArgs -NoNewWindow -PassThru -WorkingDirectory (Split-Path $pscpExe -Parent)
+            Write-RunLog "Starte PSCP-Übertragung: $source -> $destination"
+            $pscpOut = Join-Path $env:TEMP "pscp_out_$PID.log"
+            $pscpErr = Join-Path $env:TEMP "pscp_err_$PID.log"
+            $p = Start-Process -FilePath $pscpExe -ArgumentList $pscpArgs -NoNewWindow -PassThru `
+                    -RedirectStandardOutput $pscpOut -RedirectStandardError $pscpErr `
+                    -WorkingDirectory (Split-Path $pscpExe -Parent)
             if (-not $p.WaitForExit(600000)) {
                 $p.Kill()
                 throw "PSCP Timeout nach 10 Minuten"
             }
-            if ($p.ExitCode -ne 0) { throw "PSCP ExitCode $($p.ExitCode)" }
+            $pscpStdOut = (Test-Path $pscpOut) ? ((Get-Content $pscpOut -Raw -ErrorAction SilentlyContinue) ?? '') : ''
+            $pscpStdErr = (Test-Path $pscpErr) ? ((Get-Content $pscpErr -Raw -ErrorAction SilentlyContinue) ?? '') : ''
+            Remove-Item $pscpOut, $pscpErr -Force -ErrorAction SilentlyContinue
+            if ($p.ExitCode -ne 0) {
+                $detail = ($pscpStdErr + $pscpStdOut).Trim()
+                if (-not $detail) { $detail = '(keine Ausgabe)' }
+                throw "PSCP ExitCode $($p.ExitCode): $detail"
+            }
             Write-RunLog "PSCP-Übertragung abgeschlossen."
 
             # Remote-Bereinigung per PLINK
@@ -397,17 +428,25 @@ if ($config.TransferEnabled) {
                     $remoteCmd = "find $remotePath -mindepth 1 -depth -mtime +$days -exec rm -rf {} \;"
                     $plinkArgs = @('-batch', '-ssh', '-pw', $transferPw, "$($config.TransferUser)@$($config.TransferHost)", $remoteCmd)
                     Write-RunLog "Starte Remote-Cleanup (>$days Tage) auf $($config.TransferHost)"
-                    $pl = Start-Process -FilePath $plinkExe -ArgumentList $plinkArgs -NoNewWindow -PassThru -WorkingDirectory (Split-Path $plinkExe -Parent)
+                    $plinkOut = Join-Path $env:TEMP "plink_out_$PID.log"
+                    $plinkErr = Join-Path $env:TEMP "plink_err_$PID.log"
+                    $pl = Start-Process -FilePath $plinkExe -ArgumentList $plinkArgs -NoNewWindow -PassThru `
+                            -RedirectStandardOutput $plinkOut -RedirectStandardError $plinkErr `
+                            -WorkingDirectory (Split-Path $plinkExe -Parent)
                     if (-not $pl.WaitForExit(120000)) {
                         $pl.Kill()
                         Write-RunLog "PLINK Timeout nach 2 Minuten." -Level WARN
                     }
-                    elseif ($pl.ExitCode -ne 0) {
-                        Write-RunLog "PLINK ExitCode $($pl.ExitCode)" -Level WARN
-                    }
                     else {
-                        Write-RunLog "Remote-Cleanup abgeschlossen."
+                        $plErrText = (Test-Path $plinkErr) ? ((Get-Content $plinkErr -Raw -ErrorAction SilentlyContinue) ?? '') : ''
+                        if ($pl.ExitCode -ne 0) {
+                            Write-RunLog "PLINK ExitCode $($pl.ExitCode): $($plErrText.Trim())" -Level WARN
+                        }
+                        else {
+                            Write-RunLog "Remote-Cleanup abgeschlossen."
+                        }
                     }
+                    Remove-Item $plinkOut, $plinkErr -Force -ErrorAction SilentlyContinue
                 }
             }
         }
