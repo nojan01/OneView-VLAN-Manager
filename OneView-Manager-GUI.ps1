@@ -4037,6 +4037,8 @@ function Show-ReadmeHelp {
             return
         }
 
+        Write-GUILog "Hilfe wird vorbereitet…" -Color ([System.Drawing.Color]::Gray)
+
         # Markdown -> HTML (PS 6+: ConvertFrom-Markdown verwendet Markdig)
         $bodyHtml = $null
         try {
@@ -4050,7 +4052,7 @@ function Show-ReadmeHelp {
 
         $css = @'
 <style>
-    body { font-family: "Segoe UI", Arial, sans-serif; font-size: 14px; color: #222; margin: 24px; line-height: 1.55; }
+    body { font-family: "Segoe UI", Arial, sans-serif; font-size: 14px; color: #222; margin: 24px; line-height: 1.55; max-width: 1100px; }
     h1 { border-bottom: 2px solid #0078d4; padding-bottom: 6px; color: #0a3a66; }
     h2 { border-bottom: 1px solid #ccc; padding-bottom: 4px; color: #0a3a66; margin-top: 28px; }
     h3 { color: #0a3a66; margin-top: 22px; }
@@ -4065,62 +4067,21 @@ function Show-ReadmeHelp {
     a:hover { text-decoration: underline; }
     blockquote { border-left: 4px solid #0078d4; margin: 12px 0; padding: 6px 14px; background: #f6fafd; color: #444; }
     ul, ol { padding-left: 28px; }
+    .topbar { position: sticky; top: 0; background: #0a3a66; color: white; padding: 10px 16px; margin: -24px -24px 20px -24px; font-size: 15px; }
+    .topbar a { color: #ffd; margin-left: 16px; }
 </style>
 '@
-        $html = "<!DOCTYPE html><html><head><meta http-equiv='X-UA-Compatible' content='IE=edge'><meta charset='utf-8'>$css</head><body>$bodyHtml</body></html>"
+        $topbar = "<div class='topbar'><strong>HPE OneView Manager – Hilfe</strong><a href='https://github.com/nojan01/OneView-VLAN-Manager' target='_blank'>GitHub Repository</a></div>"
+        $html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>OneView Manager – Hilfe</title>$css</head><body>$topbar$bodyHtml</body></html>"
 
-        # HTML in temporäre Datei schreiben (zuverlässiger als DocumentText)
+        # HTML in Temp-Datei schreiben und im Standardbrowser öffnen
         $tmpHtml = Join-Path ([System.IO.Path]::GetTempPath()) ("OneViewManager_Help_{0}.html" -f ([Guid]::NewGuid().ToString('N')))
         [System.IO.File]::WriteAllText($tmpHtml, $html, [System.Text.Encoding]::UTF8)
 
-        $frmHelp = New-Object System.Windows.Forms.Form
-        $frmHelp.Text = "HPE OneView Manager – Hilfe (README)"
-        $frmHelp.Size = New-Object System.Drawing.Size(1000, 800)
-        $frmHelp.StartPosition = "CenterParent"
-        $frmHelp.MinimumSize = New-Object System.Drawing.Size(600, 500)
-        $frmHelp.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-
-        # Toolbar (zuerst hinzufügen, damit Dock=Top korrekt zugewiesen wird)
-        $toolStrip = New-Object System.Windows.Forms.ToolStrip
-        $toolStrip.GripStyle = [System.Windows.Forms.ToolStripGripStyle]::Hidden
-        $toolStrip.Dock = [System.Windows.Forms.DockStyle]::Top
-
-        $btnOpenExt = New-Object System.Windows.Forms.ToolStripButton
-        $btnOpenExt.Text = "Im Browser öffnen"
-        $btnOpenExt.Add_Click({ Start-Process $readmePath }.GetNewClosure())
-        [void]$toolStrip.Items.Add($btnOpenExt)
-
-        $btnOpenGitHub = New-Object System.Windows.Forms.ToolStripButton
-        $btnOpenGitHub.Text = "GitHub Repository"
-        $btnOpenGitHub.Add_Click({ Start-Process "https://github.com/nojan01/OneView-VLAN-Manager" })
-        [void]$toolStrip.Items.Add($btnOpenGitHub)
-
-        $btnCloseHlp = New-Object System.Windows.Forms.ToolStripButton
-        $btnCloseHlp.Text = "Schliessen"
-        $btnCloseHlp.Alignment = [System.Windows.Forms.ToolStripItemAlignment]::Right
-        $btnCloseHlp.Add_Click({ $frmHelp.Close() }.GetNewClosure())
-        [void]$toolStrip.Items.Add($btnCloseHlp)
-
-        $frmHelp.Controls.Add($toolStrip)
-
-        # WebBrowser zuletzt hinzufügen (Dock=Fill nach Top-Element)
-        $web = New-Object System.Windows.Forms.WebBrowser
-        $web.Dock = [System.Windows.Forms.DockStyle]::Fill
-        $web.IsWebBrowserContextMenuEnabled = $true
-        $web.ScriptErrorsSuppressed = $true
-        $web.AllowWebBrowserDrop = $false
-        $web.Navigate([Uri]$tmpHtml)
-        $frmHelp.Controls.Add($web)
-
-        # Temp-Datei beim Schließen aufräumen
-        $frmHelp.Add_FormClosed({
-            try { if (Test-Path $tmpHtml) { Remove-Item -LiteralPath $tmpHtml -Force -ErrorAction SilentlyContinue } } catch {}
-        }.GetNewClosure())
-
-        [void]$frmHelp.ShowDialog($form)
-        $frmHelp.Dispose()
+        Start-Process $tmpHtml
+        Write-GUILog "Hilfe im Standardbrowser geöffnet: $tmpHtml" -Color ([System.Drawing.Color]::Green)
     } catch {
-        $msg = "Hilfe-Fenster konnte nicht angezeigt werden:`n$($_.Exception.Message)"
+        $msg = "Hilfe konnte nicht angezeigt werden:`n$($_.Exception.Message)"
         Write-GUILog $msg -Color ([System.Drawing.Color]::Red)
         [System.Windows.Forms.MessageBox]::Show(
             $msg,
