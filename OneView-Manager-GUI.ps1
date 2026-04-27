@@ -4027,6 +4027,7 @@ $btnEFuse.Add_Click({
 function Show-ReadmeHelp {
     try {
         $readmePath = Join-Path $scriptDir "README.md"
+        Write-GUILog "Hilfe: Pruefe README -> $readmePath" -Color ([System.Drawing.Color]::Gray)
         if (-not (Test-Path $readmePath)) {
             [System.Windows.Forms.MessageBox]::Show(
                 "README.md nicht gefunden:`n$readmePath",
@@ -4037,18 +4038,28 @@ function Show-ReadmeHelp {
             return
         }
 
-        Write-GUILog "Hilfe wird vorbereitet…" -Color ([System.Drawing.Color]::Gray)
+        Write-GUILog "Hilfe: Lese Markdown..." -Color ([System.Drawing.Color]::Gray)
+        $mdRaw = Get-Content $readmePath -Raw -Encoding UTF8
+        Write-GUILog ("Hilfe: {0} Zeichen gelesen" -f $mdRaw.Length) -Color ([System.Drawing.Color]::Gray)
 
-        # Markdown -> HTML (PS 6+: ConvertFrom-Markdown verwendet Markdig)
+        # Markdown -> HTML (mit Timeout-Schutz via Job, falls Markdig haengt)
         $bodyHtml = $null
+        Write-GUILog "Hilfe: Konvertiere Markdown -> HTML (max. 15 s)..." -Color ([System.Drawing.Color]::Gray)
         try {
-            $bodyHtml = (ConvertFrom-Markdown -Path $readmePath -ErrorAction Stop).Html
+            $job = Start-Job -ScriptBlock { param($p) (ConvertFrom-Markdown -Path $p).Html } -ArgumentList $readmePath
+            if (Wait-Job -Job $job -Timeout 15) {
+                $bodyHtml = Receive-Job -Job $job -ErrorAction Stop
+            } else {
+                Stop-Job -Job $job -ErrorAction SilentlyContinue
+                throw "ConvertFrom-Markdown Timeout (15 s)"
+            }
+            Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
         } catch {
-            Write-GUILog "ConvertFrom-Markdown fehlgeschlagen: $($_.Exception.Message) – zeige Rohtext." -Color ([System.Drawing.Color]::Orange)
-            $raw = (Get-Content $readmePath -Raw -Encoding UTF8)
-            $raw = $raw.Replace('&','&amp;').Replace('<','&lt;').Replace('>','&gt;')
-            $bodyHtml = "<pre>$raw</pre>"
+            Write-GUILog "Hilfe: Markdown-Konvertierung fehlgeschlagen ($($_.Exception.Message)) -> Rohtext-Fallback." -Color ([System.Drawing.Color]::Orange)
+            $escaped = $mdRaw.Replace('&','&amp;').Replace('<','&lt;').Replace('>','&gt;')
+            $bodyHtml = "<pre>$escaped</pre>"
         }
+        Write-GUILog ("Hilfe: HTML-Body laenge: {0} Zeichen" -f $bodyHtml.Length) -Color ([System.Drawing.Color]::Gray)
 
         $css = @'
 <style>
@@ -4071,15 +4082,20 @@ function Show-ReadmeHelp {
     .topbar a { color: #ffd; margin-left: 16px; }
 </style>
 '@
-        $topbar = "<div class='topbar'><strong>HPE OneView Manager – Hilfe</strong><a href='https://github.com/nojan01/OneView-VLAN-Manager' target='_blank'>GitHub Repository</a></div>"
-        $html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>OneView Manager – Hilfe</title>$css</head><body>$topbar$bodyHtml</body></html>"
+        $topbar = "<div class='topbar'><strong>HPE OneView Manager &ndash; Hilfe</strong><a href='https://github.com/nojan01/OneView-VLAN-Manager' target='_blank'>GitHub Repository</a></div>"
+        $html = "<!DOCTYPE html><html><head><meta charset='utf-8'><title>OneView Manager - Hilfe</title>$css</head><body>$topbar$bodyHtml</body></html>"
 
-        # HTML in Temp-Datei schreiben und im Standardbrowser öffnen
         $tmpHtml = Join-Path ([System.IO.Path]::GetTempPath()) ("OneViewManager_Help_{0}.html" -f ([Guid]::NewGuid().ToString('N')))
-        [System.IO.File]::WriteAllText($tmpHtml, $html, [System.Text.Encoding]::UTF8)
+        Write-GUILog "Hilfe: Schreibe Temp-Datei: $tmpHtml" -Color ([System.Drawing.Color]::Gray)
+        [System.IO.File]::WriteAllText($tmpHtml, $html, [System.Text.UTF8Encoding]::new($false))
 
-        Start-Process $tmpHtml
-        Write-GUILog "Hilfe im Standardbrowser geöffnet: $tmpHtml" -Color ([System.Drawing.Color]::Green)
+        Write-GUILog "Hilfe: Oeffne im Standardbrowser..." -Color ([System.Drawing.Color]::Gray)
+        # Ohne UseShellExecute haengt der Aufruf bei .html. Explizit ShellExecute nutzen.
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $tmpHtml
+        $psi.UseShellExecute = $true
+        [void][System.Diagnostics.Process]::Start($psi)
+        Write-GUILog "Hilfe: Geoeffnet." -Color ([System.Drawing.Color]::Green)
     } catch {
         $msg = "Hilfe konnte nicht angezeigt werden:`n$($_.Exception.Message)"
         Write-GUILog $msg -Color ([System.Drawing.Color]::Red)
