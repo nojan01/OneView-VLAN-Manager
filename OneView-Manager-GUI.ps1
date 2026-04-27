@@ -98,12 +98,13 @@ $tblTools = New-Object System.Windows.Forms.TableLayoutPanel
 $tblTools.Location = New-Object System.Drawing.Point(10, 22)
 $tblTools.Size = New-Object System.Drawing.Size(748, 34)
 $tblTools.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$tblTools.ColumnCount = 4
+$tblTools.ColumnCount = 5
 $tblTools.RowCount = 1
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25.0))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25.0))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25.0))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
 $tblTools.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100))) | Out-Null
 $grpTools.Controls.Add($tblTools)
 
@@ -144,12 +145,23 @@ $tblTools.Controls.Add($btnUserManager, 2, 0)
 $btnAlerts = New-Object System.Windows.Forms.Button
 $btnAlerts.Text = "Alerts"
 $btnAlerts.Dock = [System.Windows.Forms.DockStyle]::Fill
-$btnAlerts.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 0)
+$btnAlerts.Margin = New-Object System.Windows.Forms.Padding(3, 0, 3, 0)
 $btnAlerts.BackColor = [System.Drawing.Color]::FromArgb(160, 40, 60)
 $btnAlerts.ForeColor = [System.Drawing.Color]::White
 $btnAlerts.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnAlerts.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblTools.Controls.Add($btnAlerts, 3, 0)
+
+# Button: Synergy eFuse
+$btnEFuse = New-Object System.Windows.Forms.Button
+$btnEFuse.Text = "Synergy eFuse"
+$btnEFuse.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnEFuse.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 0)
+$btnEFuse.BackColor = [System.Drawing.Color]::FromArgb(180, 0, 0)
+$btnEFuse.ForeColor = [System.Drawing.Color]::White
+$btnEFuse.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnEFuse.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblTools.Controls.Add($btnEFuse, 4, 0)
 
 # ============================================================================
 #  GroupBox: Anmeldeinformationen
@@ -3979,6 +3991,24 @@ $btnAlerts.Add_Click({
     }
     Write-GUILog "Starte Alerts Tool…" -Color ([System.Drawing.Color]::Orange)
     Start-Process pwsh -ArgumentList "-NoProfile -File `"$alertsScript`""
+})
+
+# ============================================================================
+#  Button-Event: Synergy eFuse (eigenständiges Tool)
+# ============================================================================
+$btnEFuse.Add_Click({
+    $eFuseScript = Join-Path $scriptDir "Synergy_eFuse\eFuse_GUI.ps1"
+    if (-not (Test-Path $eFuseScript)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "eFuse-Script nicht gefunden:`n$eFuseScript",
+            "Datei fehlt",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+    Write-GUILog "Starte Synergy eFuse Tool…" -Color ([System.Drawing.Color]::Orange)
+    Start-Process pwsh -ArgumentList "-NoProfile -File `"$eFuseScript`""
 })
 
 # ============================================================================
