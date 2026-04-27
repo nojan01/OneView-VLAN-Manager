@@ -2,7 +2,21 @@
 
 Grafische Oberfläche (WinForms GUI) zur Verwaltung von **Ethernet Networks**, **Network Sets**, **Server Profiles** und **Server Profile Templates** in HPE OneView. Unterstützt mehrere Appliances gleichzeitig und verwendet ausschliesslich die **HPE OneView RESTful API** (ohne das HPE OneView PowerShell-Modul).
 
+Darüber hinaus enthält das Projekt mehrere **eigenständige Tools** rund um den Betrieb von HPE OneView/Synergy: Appliance-Update, Config-Backup, User-Verwaltung, Alerts und ein Synergy-eFuse-Tool.
+
 ## Features
+
+### Eigenständige Tools (in der Haupt-GUI verlinkt)
+
+Die Haupt-GUI `OneView-Manager-GUI.ps1` enthält oben einen Bereich **„Eigenständige Tools"**, der folgende separate Skripte startet (jedes Tool hat eine eigene GUI und eine eigene Anmeldung):
+
+| Button | Skript | Funktion |
+|---|---|---|
+| **Appliance Update** | `Oneview_Update/OneView_Update_GUI.ps1` | OneView/Synergy Update-Workflow |
+| **Config Backup** | `Oneview_Backup/Backup_OneView_GUI.ps1` | OneView Konfigurations-Backup (manuell + geplant) |
+| **User Manager** | `Oneview_UserManager/OneView-UserManager-GUI.ps1` | Benutzerverwaltung über mehrere Appliances (OV 6.60 und 11.10) |
+| **Alerts** | `Oneview_Alerts/Oneview_Alerts_GUI.ps1` | Alert-Auswertung (manuell + geplant) |
+| **Synergy eFuse** | `Synergy_eFuse/eFuse_GUI.ps1` | eFuse für Synergy-Komponenten (Device/ICM/Appliance/FLM) |
 
 ### GUI (OneView-Manager-GUI.ps1)
 
@@ -84,32 +98,74 @@ Bei Multi-Appliance-Operationen (Backup, Multi-Deploy) wird ein einzelnes Log pr
 
 Die GUI bleibt während langer Operationen (z.B. Import von 250+ Netzwerken) responsiv. Die Ausgabe der Subprozesse wird zeilenweise in das Protokollfenster geschrieben.
 
+## Synergy eFuse Tool
+
+Das Tool [Synergy_eFuse/eFuse_GUI.ps1](Synergy_eFuse/eFuse_GUI.ps1) löst gezielt einen **eFuse** auf einer Synergy-Komponente aus (entspricht `Reset-OVEnclosureDevice -eFuse`). Es verwendet im Gegensatz zur Haupt-GUI das offizielle **HPEOneView**-PowerShell-Modul.
+
+Ablauf:
+
+1. Login (Benutzername / Kennwort)
+2. Auswahl der Appliance aus `Synergy_eFuse/Oneview.txt` (eine Appliance pro Zeile)
+3. Verbinden – Enclosures werden automatisch geladen
+4. Auswahl von **Enclosure**, **Komponente** und **Slot-Nummer**
+   - Komponenten: `Device (BladeServer)`, `ICM (VirtualConnectModule)`, `Appliance (Composer)`, `FLM (FrameLinkModule)`
+5. Bestätigungsdialog mit allen Parametern
+6. Ausführung und Protokollierung im integrierten Log-Fenster
+
+Voraussetzung: Installiertes HPE OneView PowerShell-Modul (`Install-Module HPEOneView.*`).
+
+## Weitere eigenständige Tools
+
+- **Appliance Update** (`Oneview_Update/OneView_Update_GUI.ps1`) – Geführter Update-Workflow für OneView/Synergy. Benötigt das `HPEOneView.1000`-Modul.
+- **Config Backup** (`Oneview_Backup/`) – Manuelles Backup über `Backup_OneView_GUI.ps1` sowie geplante Backups via `Backup_OneView_Scheduled.ps1` (konfigurierbar über `Backup_OneView_TaskConfig_GUI.ps1`).
+- **User Manager** (`Oneview_UserManager/OneView-UserManager-GUI.ps1`) – Direkte REST-API-Verwaltung von OneView-Benutzern, parallel auf mehreren Appliances; unterstützt unterschiedliche API-Versionen (OV 6.60 / 11.10) durch automatische Erkennung.
+- **Alerts** (`Oneview_Alerts/`) – `Oneview_Alerts_GUI.ps1` für interaktive Auswertung, `Oneview_Alerts_Scheduled.ps1` für regelmässige Reports, Konfiguration über `Oneview_Alerts_TaskConfig_GUI.ps1`.
+
 ## Projektstruktur
 
 ```
 OneView-VLAN-Manager/
-├── OneView-Manager-GUI.ps1            # Haupt-GUI (WinForms)
-├── Create-EthernetNetworks.ps1       # Ethernet Networks erstellen/aktualisieren
-├── Create-NetworkSets.ps1            # Network Sets erstellen/aktualisieren
-├── Export-EthernetNetworks.ps1       # Ethernet Networks nach Excel exportieren
-├── Export-NetworkSets.ps1            # Network Sets nach Excel exportieren
-├── Export-ServerProfiles.ps1         # Server Profiles als JSON exportieren
-├── Import-ServerProfiles.ps1         # Server Profiles aus JSON importieren
+├── OneView-Manager-GUI.ps1            # Haupt-GUI (WinForms) – VLANs, Network Sets, SP/SPT
+├── OneView-NetworkManager-GUI.ps1     # Alternative Netzwerk-GUI
+├── Create-EthernetNetworks.ps1        # Ethernet Networks erstellen/aktualisieren
+├── Create-NetworkSets.ps1             # Network Sets erstellen/aktualisieren
+├── Export-EthernetNetworks.ps1        # Ethernet Networks nach Excel exportieren
+├── Export-NetworkSets.ps1             # Network Sets nach Excel exportieren
+├── Export-ServerProfiles.ps1          # Server Profiles als JSON exportieren
+├── Import-ServerProfiles.ps1          # Server Profiles aus JSON importieren
 ├── Export-ServerProfileTemplates.ps1  # Server Profile Templates als JSON exportieren
 ├── Import-ServerProfileTemplates.ps1  # Server Profile Templates aus JSON importieren
-├── New-ExcelTemplate.ps1             # Excel-Vorlage mit Beispieldaten generieren
-├── config.json                       # Konfiguration (API-Version, Defaults)
-├── Appliances.txt                    # Liste der OneView Appliances mit Typ
-└── README.md                         # Diese Datei
+├── New-ExcelTemplate.ps1              # Excel-Vorlage mit Beispieldaten generieren
+├── Change_Oneview_Password.ps1        # Hilfsskript zum Ändern des OneView-Passworts
+├── config.json                        # Konfiguration (API-Version, Defaults)
+├── Appliances.txt                     # Liste der OneView Appliances mit Typ
+├── README.md                          # Diese Datei
+│
+├── Oneview_Update/                    # Eigenständiges Tool: Appliance-Update
+│   └── OneView_Update_GUI.ps1
+├── Oneview_Backup/                    # Eigenständiges Tool: Config-Backup
+│   ├── Backup_OneView_GUI.ps1
+│   ├── Backup_OneView_Scheduled.ps1
+│   └── Backup_OneView_TaskConfig_GUI.ps1
+├── Oneview_UserManager/               # Eigenständiges Tool: User Manager
+│   └── OneView-UserManager-GUI.ps1
+├── Oneview_Alerts/                    # Eigenständiges Tool: Alerts
+│   ├── Oneview_Alerts_GUI.ps1
+│   ├── Oneview_Alerts_Scheduled.ps1
+│   └── Oneview_Alerts_TaskConfig_GUI.ps1
+└── Synergy_eFuse/                     # Eigenständiges Tool: Synergy eFuse
+    └── eFuse_GUI.ps1
 ```
 
 ## Voraussetzungen
 
 | Komponente | Mindestversion |
 |---|---|
-| PowerShell | 7.x (Windows) |
+| PowerShell | 7.x (Windows) – Haupt-GUI und die meisten Tools |
+| PowerShell | 5.1+ – `Synergy_eFuse/eFuse_GUI.ps1` |
 | Modul `ImportExcel` | aktuell (wird bei Bedarf automatisch installiert) |
-| HPE OneView Appliance | API Version 5600+ (OneView 8.50+) |
+| Modul `HPEOneView.*` | nur für `Synergy_eFuse` und `Oneview_Update` erforderlich |
+| HPE OneView Appliance | API Version 5600+ (OneView 8.50+) für Haupt-GUI; User Manager unterstützt zusätzlich OV 6.60 |
 
 ## Einrichtung
 
