@@ -98,13 +98,14 @@ $tblTools = New-Object System.Windows.Forms.TableLayoutPanel
 $tblTools.Location = New-Object System.Drawing.Point(10, 22)
 $tblTools.Size = New-Object System.Drawing.Size(748, 34)
 $tblTools.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$tblTools.ColumnCount = 5
+$tblTools.ColumnCount = 6
 $tblTools.RowCount = 1
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 20.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 18.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 18.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 18.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 18.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 18.0))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 10.0))) | Out-Null
 $tblTools.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 100))) | Out-Null
 $grpTools.Controls.Add($tblTools)
 
@@ -156,12 +157,23 @@ $tblTools.Controls.Add($btnAlerts, 3, 0)
 $btnEFuse = New-Object System.Windows.Forms.Button
 $btnEFuse.Text = "Synergy eFuse"
 $btnEFuse.Dock = [System.Windows.Forms.DockStyle]::Fill
-$btnEFuse.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 0)
+$btnEFuse.Margin = New-Object System.Windows.Forms.Padding(3, 0, 3, 0)
 $btnEFuse.BackColor = [System.Drawing.Color]::FromArgb(180, 0, 0)
 $btnEFuse.ForeColor = [System.Drawing.Color]::White
 $btnEFuse.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnEFuse.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblTools.Controls.Add($btnEFuse, 4, 0)
+
+# Button: Hilfe (README)
+$btnHelp = New-Object System.Windows.Forms.Button
+$btnHelp.Text = "Hilfe ?"
+$btnHelp.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnHelp.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 0)
+$btnHelp.BackColor = [System.Drawing.Color]::FromArgb(80, 80, 80)
+$btnHelp.ForeColor = [System.Drawing.Color]::White
+$btnHelp.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnHelp.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblTools.Controls.Add($btnHelp, 5, 0)
 
 # ============================================================================
 #  GroupBox: Anmeldeinformationen
@@ -4009,6 +4021,99 @@ $btnEFuse.Add_Click({
     }
     Write-GUILog "Starte Synergy eFuse Tool…" -Color ([System.Drawing.Color]::Orange)
     Start-Process pwsh -ArgumentList "-NoProfile -File `"$eFuseScript`""
+})
+
+# ============================================================================
+#  Hilfe: README.md in einem Fenster anzeigen (Markdown -> HTML -> WebBrowser)
+# ============================================================================
+function Show-ReadmeHelp {
+    $readmePath = Join-Path $scriptDir "README.md"
+    if (-not (Test-Path $readmePath)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "README.md nicht gefunden:`n$readmePath",
+            "Datei fehlt",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+
+    # Markdown -> HTML (PS 6+: ConvertFrom-Markdown verwendet Markdig)
+    try {
+        $bodyHtml = (ConvertFrom-Markdown -Path $readmePath -ErrorAction Stop).Html
+    } catch {
+        # Fallback: Rohtext darstellen
+        $raw = [System.Web.HttpUtility]::HtmlEncode((Get-Content $readmePath -Raw))
+        $bodyHtml = "<pre>$raw</pre>"
+    }
+
+    $css = @"
+<style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 14px; color: #222; margin: 24px; line-height: 1.55; }
+    h1 { border-bottom: 2px solid #0078d4; padding-bottom: 6px; color: #0a3a66; }
+    h2 { border-bottom: 1px solid #ccc; padding-bottom: 4px; color: #0a3a66; margin-top: 28px; }
+    h3 { color: #0a3a66; margin-top: 22px; }
+    code { background: #f3f3f3; padding: 1px 4px; border-radius: 3px; font-family: Consolas, 'Courier New', monospace; font-size: 13px; }
+    pre { background: #1e1e1e; color: #e6e6e6; padding: 12px; border-radius: 4px; overflow-x: auto; }
+    pre code { background: transparent; color: inherit; padding: 0; font-size: 13px; }
+    table { border-collapse: collapse; margin: 12px 0; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    th { background: #eef3f8; }
+    tr:nth-child(even) td { background: #fafafa; }
+    a { color: #0078d4; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    blockquote { border-left: 4px solid #0078d4; margin: 12px 0; padding: 6px 14px; background: #f6fafd; color: #444; }
+    ul, ol { padding-left: 28px; }
+</style>
+"@
+    $html = "<!DOCTYPE html><html><head><meta charset='utf-8'>$css</head><body>$bodyHtml</body></html>"
+
+    $frmHelp = New-Object System.Windows.Forms.Form
+    $frmHelp.Text = "HPE OneView Manager – Hilfe (README)"
+    $frmHelp.Size = New-Object System.Drawing.Size(1000, 800)
+    $frmHelp.StartPosition = "CenterParent"
+    $frmHelp.MinimumSize = New-Object System.Drawing.Size(600, 500)
+    $frmHelp.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+    $web = New-Object System.Windows.Forms.WebBrowser
+    $web.Dock = [System.Windows.Forms.DockStyle]::Fill
+    $web.IsWebBrowserContextMenuEnabled = $true
+    $web.ScriptErrorsSuppressed = $true
+    $web.AllowWebBrowserDrop = $false
+    $web.DocumentText = $html
+    $frmHelp.Controls.Add($web)
+
+    # Toolbar oben
+    $toolStrip = New-Object System.Windows.Forms.ToolStrip
+    $toolStrip.GripStyle = [System.Windows.Forms.ToolStripGripStyle]::Hidden
+
+    $btnOpenExt = New-Object System.Windows.Forms.ToolStripButton
+    $btnOpenExt.Text = "Im Browser öffnen"
+    $btnOpenExt.Add_Click({ Start-Process $readmePath })
+    $toolStrip.Items.Add($btnOpenExt) | Out-Null
+
+    $btnOpenGitHub = New-Object System.Windows.Forms.ToolStripButton
+    $btnOpenGitHub.Text = "GitHub Repository"
+    $btnOpenGitHub.Add_Click({ Start-Process "https://github.com/nojan01/OneView-VLAN-Manager" })
+    $toolStrip.Items.Add($btnOpenGitHub) | Out-Null
+
+    $btnClose = New-Object System.Windows.Forms.ToolStripButton
+    $btnClose.Text = "Schliessen"
+    $btnClose.Alignment = [System.Windows.Forms.ToolStripItemAlignment]::Right
+    $btnClose.Add_Click({ $frmHelp.Close() })
+    $toolStrip.Items.Add($btnClose) | Out-Null
+
+    $frmHelp.Controls.Add($toolStrip)
+
+    [void]$frmHelp.ShowDialog($form)
+    $frmHelp.Dispose()
+}
+
+# ============================================================================
+#  Button-Event: Hilfe
+# ============================================================================
+$btnHelp.Add_Click({
+    Show-ReadmeHelp
 })
 
 # ============================================================================
