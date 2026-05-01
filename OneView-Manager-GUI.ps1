@@ -76,13 +76,24 @@ function Get-AppliancesFromFile {
 # ============================================================================
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "HPE OneView Manager"
-$form.Size = New-Object System.Drawing.Size(820, 1165)
 $form.StartPosition = "CenterScreen"
-$form.MinimumSize = New-Object System.Drawing.Size(700, 850)
 $form.MaximizeBox = $true
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::Sizable
 $form.SizeGripStyle = [System.Windows.Forms.SizeGripStyle]::Show
 $form.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$form.AutoScroll = $true
+$form.AutoScrollMinSize = New-Object System.Drawing.Size(800, 1145)
+
+# Fenstergroesse an aktuellen Bildschirm anpassen (kleinere Monitore)
+$screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position).WorkingArea
+$preferredW = 820
+$preferredH = 1165
+$marginW = 20
+$marginH = 60
+$targetW = [Math]::Min($preferredW, [Math]::Max(700, $screen.Width  - $marginW))
+$targetH = [Math]::Min($preferredH, [Math]::Max(500, $screen.Height - $marginH))
+$form.MinimumSize = New-Object System.Drawing.Size(700, 500)
+$form.Size = New-Object System.Drawing.Size($targetW, $targetH)
 
 # ============================================================================
 #  GroupBox: Eigenständige Tools (keine Anmeldung erforderlich)
