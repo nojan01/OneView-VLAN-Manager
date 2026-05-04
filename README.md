@@ -164,7 +164,7 @@ OneView-VLAN-Manager/
 | PowerShell | 7.x (Windows) – alle GUIs und Tools |
 | Modul `ImportExcel` | aktuell (wird bei Bedarf automatisch installiert) |
 | Modul `HPEOneView.*` | nur für `Synergy_eFuse` und `Oneview_Update` erforderlich |
-| HPE OneView Appliance | API Version 5600+ (OneView 8.50+) für Haupt-GUI; User Manager unterstützt zusätzlich OV 6.60 |
+| HPE OneView Appliance | API Version 3800 (OneView 6.60) API Version 8400 (OneView 11.10) |
 
 ## Einrichtung
 
@@ -307,10 +307,10 @@ Die Scripts können auch direkt aufgerufen werden:
 
 | OneView Version | API Version |
 |---|---|
-| 8.50 | 5600 |
-| 9.00 | 6600 |
+| 6.60 | 3800 |
 | 10.00 | 7600 |
 | 10.20 | 8000 |
+| 11.10 | 8400 |
 
 ## Sicherheitshinweise
 
