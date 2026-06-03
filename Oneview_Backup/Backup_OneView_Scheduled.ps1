@@ -10,16 +10,18 @@
     Prozesse = Modul-Isolation) Backups der HPE OneView Appliances.
 
     Unterstützt:
-      - OV 6.60 (HPEOneView.660)
-      - OV 11.10 (HPEOneView.1000)
+      - Versionsuebergreifend (OV 6.60, OV 11.x, ...): die OneView-Software-
+        Version wird pro Appliance per /rest/version automatisch erkannt und
+        das passende HPEOneView-PowerShell-Modul aus OneView_VersionMap.ps1
+        gewaehlt. Pro benoetigtem Modul laeuft ein eigener Start-Job.
       - Optionale Übertragung der Backups per PSCP an einen Zielhost
       - Optionale Remote-Bereinigung per PLINK
       - Lokale Bereinigung älter als X Tage
       - Optionaler E-Mail-Versand einer Zusammenfassung (inkl. Fehler)
 
 .NOTES
-    Erfordert: PowerShell 7.x (Windows), Module HPEOneView.660 und/oder
-    HPEOneView.1000 (je nach Appliance-Versionen).
+    Erfordert: PowerShell 7.x (Windows), HPEOneView-Module je nach Bedarf
+    (z.B. HPEOneView.660 fuer OV 6.x, HPEOneView.1000 fuer OV 11.x).
 #>
 
 param(
@@ -34,6 +36,9 @@ if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
 if (-not $ConfigPath) { $ConfigPath = Join-Path $scriptDir 'backup_task_config.json' }
 $keyFile = Join-Path $scriptDir 'backup_task_key.bin'
 $credFile = Join-Path $scriptDir 'backup_task_cred.xml'
+
+# Versions-/Modul-Tabelle einbinden (Resolve-OvModule, Get-OvVersionInfo)
+. (Join-Path $scriptDir 'OneView_VersionMap.ps1')
 
 function Resolve-ScriptPath {
     param([string]$Path)
@@ -108,46 +113,76 @@ try { [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { 
 $Global:SetLibraryBypassCertificatePolicy = $true
 
 # ---------------------------------------------------------------------------
-# Appliance-Listen einlesen
+# Appliance-Liste einlesen (eine Datei, Versionserkennung erfolgt unten)
 # ---------------------------------------------------------------------------
-$ipFile660 = Resolve-ScriptPath $config.IPFile660
-$ipFile1110 = Resolve-ScriptPath $config.IPFile1110
+# Fallback: ggf. alte Konfigschluessel IPFile660/IPFile1110 mit auswerten,
+# damit bestehende backup_task_config.json kompatibel bleibt.
+$ipFileNew  = Resolve-ScriptPath $config.IPFile
+$ipFileOld1 = Resolve-ScriptPath $config.IPFile660
+$ipFileOld2 = Resolve-ScriptPath $config.IPFile1110
 
-$appliances660 = @()
-$appliances1110 = @()
-if ($ipFile660 -and (Test-Path $ipFile660)) {
-    $appliances660 = @(Get-Content $ipFile660 | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+$rawAppliances = New-Object System.Collections.Generic.List[string]
+foreach ($f in @($ipFileNew, $ipFileOld1, $ipFileOld2)) {
+    if ($f -and (Test-Path $f)) {
+        $entries = @(Get-Content $f | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+        foreach ($e in $entries) { if (-not $rawAppliances.Contains($e)) { $rawAppliances.Add($e) | Out-Null } }
+    }
 }
-else {
-    Write-RunLog "OV 6.60 IP-Datei nicht gefunden: $ipFile660" -Level WARN
-}
-if ($ipFile1110 -and (Test-Path $ipFile1110)) {
-    $appliances1110 = @(Get-Content $ipFile1110 | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
-}
-else {
-    Write-RunLog "OV 11.10 IP-Datei nicht gefunden: $ipFile1110" -Level WARN
+if (-not $ipFileNew -or -not (Test-Path $ipFileNew)) {
+    if ($ipFileNew) { Write-RunLog "OneView IP-Datei nicht gefunden: $ipFileNew" -Level WARN }
+    else            { Write-RunLog "Konfigschluessel 'IPFile' nicht gesetzt - nutze ggf. legacy IPFile660/IPFile1110." -Level WARN }
 }
 
-if ($appliances660.Count -eq 0 -and $appliances1110.Count -eq 0) {
+if ($rawAppliances.Count -eq 0) {
     Write-RunLog "Keine Appliances zu sichern." -Level ERROR
     throw "Keine Appliances konfiguriert."
 }
-Write-RunLog ("OV 6.60: {0} Appliance(s) | OV 11.10: {1} Appliance(s)" -f $appliances660.Count, $appliances1110.Count)
+Write-RunLog ("Appliances aus Konfiguration: {0}" -f $rawAppliances.Count)
 
-$have660 = [bool](Get-Module -ListAvailable -Name 'HPEOneView.660')
-$have1000 = [bool](Get-Module -ListAvailable -Name 'HPEOneView.1000')
-if (-not ($have660 -or $have1000)) {
-    Write-RunLog "Kein HPEOneView-Modul installiert." -Level ERROR
-    throw "Kein HPEOneView-Modul installiert."
+# ---------------------------------------------------------------------------
+# Versions-Auto-Erkennung + Gruppierung pro Modul
+# ---------------------------------------------------------------------------
+$applianceGroups = @{}   # Module -> @{ Module; Label; List }
+$unresolved      = @()
+foreach ($ip in $rawAppliances) {
+    $info = Get-OvVersionInfo -Appliance $ip -TimeoutSec 10
+    if ($info.Module) {
+        $verLabel = if ($info.MajorMinor) { $info.MajorMinor } else { $info.SoftwareVersion }
+        if (-not $applianceGroups.ContainsKey($info.Module)) {
+            $applianceGroups[$info.Module] = [PSCustomObject]@{ Module = $info.Module; Label = $verLabel; List = @() }
+        } else {
+            $existing = $applianceGroups[$info.Module]
+            if ($existing.Label -ne $verLabel) {
+                $major = ($verLabel -split '\.')[0]
+                $existing.Label = "$major.x"
+            }
+        }
+        $applianceGroups[$info.Module].List += $ip
+        Write-RunLog ("{0,-25} -> OV {1} (Modul {2})" -f $ip, $verLabel, $info.Module)
+    } else {
+        $unresolved += [PSCustomObject]@{ Appliance = $ip; Reason = $info.Error }
+        Write-RunLog ("{0,-25} -> Versionserkennung fehlgeschlagen: {1}" -f $ip, $info.Error) -Level WARN
+    }
 }
-if ($appliances660.Count -gt 0 -and -not $have660) {
-    Write-RunLog "HPEOneView.660 nicht installiert - OV 6.60 Appliances werden übersprungen." -Level WARN
-    $appliances660 = @()
+
+# Modul-Verfuegbarkeit pruefen, andernfalls Gruppe verwerfen
+foreach ($key in @($applianceGroups.Keys)) {
+    $g = $applianceGroups[$key]
+    if (-not (Get-Module -ListAvailable -Name $g.Module)) {
+        Write-RunLog ("Modul '{0}' nicht installiert - {1} Appliance(s) (OV {2}) werden uebersprungen." -f $g.Module, $g.List.Count, $g.Label) -Level WARN
+        foreach ($ip in $g.List) { $unresolved += [PSCustomObject]@{ Appliance = $ip; Reason = "Modul $($g.Module) nicht installiert" } }
+        $applianceGroups.Remove($key)
+    }
 }
-if ($appliances1110.Count -gt 0 -and -not $have1000) {
-    Write-RunLog "HPEOneView.1000 nicht installiert - OV 11.10 Appliances werden übersprungen." -Level WARN
-    $appliances1110 = @()
+
+if ($applianceGroups.Count -eq 0) {
+    Write-RunLog "Keine Appliance mit ermittelbarer Version / verfuegbarem Modul." -Level ERROR
+    throw "Keine sicherungsfaehigen Appliances."
 }
+
+$totalCount = 0
+foreach ($g in $applianceGroups.Values) { $totalCount += $g.List.Count }
+Write-RunLog ("Gruppen: {0} | Sichere insgesamt {1} Appliance(s) | uebersprungen: {2}" -f $applianceGroups.Count, $totalCount, $unresolved.Count)
 
 # ---------------------------------------------------------------------------
 # Zielordner vorbereiten
@@ -262,6 +297,19 @@ $batchScript = {
                     throw "Backup-Job abgeschlossen, aber keine Backup-Datei im Ordner '$currentFolder' gefunden."
                 }
                 $backupFile = $backupFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+                # Ab OV 11.20 enthaelt der HPE-Backup-Dateiname den Appliance-Hostname nicht mehr.
+                # Damit die Zuordnung der Datei zur Appliance erhalten bleibt, wird der Hostname als Prefix vorangestellt.
+                if ($backupFile.Name -notlike "$appliance*") {
+                    $safeName = ($appliance -replace '[\\/:*?"<>|]', '_')
+                    $newName  = "${safeName}_$($backupFile.Name)"
+                    try {
+                        $renamed = Rename-Item -LiteralPath $backupFile.FullName -NewName $newName -PassThru -ErrorAction Stop
+                        $backupFile = Get-Item -LiteralPath $renamed.FullName
+                    } catch {
+                        [PSCustomObject]@{ Type = 'LOG'; Message = "WARNUNG: Backup-Datei konnte nicht umbenannt werden: $($_.Exception.Message)" }
+                    }
+                }
                 $sizeMB = [math]::Round($backupFile.Length / 1MB, 2)
 
                 [PSCustomObject]@{ Type = 'UPDATE'; Appliance = $appliance; Status = 'Erfolgreich'; Detail = "Backup erstellt: $($backupFile.Name) ($sizeMB MB, Versuch $attempt)." }
@@ -290,18 +338,13 @@ $batchScript = {
 }
 
 # ---------------------------------------------------------------------------
-# Jobs starten
+# Jobs starten (pro benoetigtem Modul ein eigener Start-Job)
 # ---------------------------------------------------------------------------
 $jobs = @()
-if ($appliances660.Count -gt 0) {
-    $jobs += Start-Job -Name 'OV 6.60' -ScriptBlock $batchScript -ArgumentList @(
-        ($appliances660 -join '|'), 'HPEOneView.660', '6.60',
-        $credential, $folderPath, $baseBackupDir, $date, $plainPassphrase, $errorLogFile
-    )
-}
-if ($appliances1110.Count -gt 0) {
-    $jobs += Start-Job -Name 'OV 11.10' -ScriptBlock $batchScript -ArgumentList @(
-        ($appliances1110 -join '|'), 'HPEOneView.1000', '11.10',
+foreach ($g in $applianceGroups.Values) {
+    if ($g.List.Count -eq 0) { continue }
+    $jobs += Start-Job -Name ("OV " + $g.Label) -ScriptBlock $batchScript -ArgumentList @(
+        ($g.List -join '|'), $g.Module, $g.Label,
         $credential, $folderPath, $baseBackupDir, $date, $plainPassphrase, $errorLogFile
     )
 }
@@ -311,8 +354,14 @@ Remove-Variable plainPassphrase -ErrorAction SilentlyContinue
 # Ergebnisse sammeln
 # ---------------------------------------------------------------------------
 $results = @{}  # Appliance -> [PSCustomObject]@{ Status, Detail, Version }
-foreach ($a in $appliances660) { $results[$a] = [PSCustomObject]@{ Status = 'Ausstehend'; Detail = ''; Version = '6.60' } }
-foreach ($a in $appliances1110) { $results[$a] = [PSCustomObject]@{ Status = 'Ausstehend'; Detail = ''; Version = '11.10' } }
+foreach ($g in $applianceGroups.Values) {
+    foreach ($a in $g.List) { $results[$a] = [PSCustomObject]@{ Status = 'Ausstehend'; Detail = ''; Version = $g.Label } }
+}
+foreach ($u in $unresolved) {
+    if (-not $results.ContainsKey($u.Appliance)) {
+        $results[$u.Appliance] = [PSCustomObject]@{ Status = 'Fehler'; Detail = $u.Reason; Version = '?' }
+    }
+}
 
 $jobs | ForEach-Object { $_ | Wait-Job | Out-Null }
 foreach ($job in $jobs) {

@@ -647,6 +647,15 @@ function New-WorkerScript {
     $workerLines += '        $backupDir = Join-Path $logDir "OneView_Backup"'
     $workerLines += '        if (!(Test-Path $backupDir)) { New-Item -ItemType Directory -Path $backupDir -Force | Out-Null }'
     $workerLines += '        new-OVBackup -Location $backupDir -Force -Passphrase $securePassphrase'
+    $workerLines += '        # OV 11.20+: Backup-Dateiname enthaelt Appliance-Hostname nicht mehr -> als Prefix anfuegen'
+    $workerLines += '        $rcvFiles = @(Get-ChildItem -Path $backupDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -ne ".log" -and $_.Length -gt 0 })'
+    $workerLines += '        if ($rcvFiles.Count -gt 0) {'
+    $workerLines += '            $rcvFile = $rcvFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1'
+    $workerLines += '            if ($rcvFile.Name -notlike "$Appliance*") {'
+    $workerLines += '                $safeName = ($Appliance -replace ''[\\/:*?"<>|]'', ''_'')'
+    $workerLines += '                try { Rename-Item -LiteralPath $rcvFile.FullName -NewName ("${safeName}_" + $rcvFile.Name) -ErrorAction Stop } catch { Write-Host ("WARNUNG: Backup-Datei konnte nicht umbenannt werden: " + $_.Exception.Message) -ForegroundColor Yellow }'
+    $workerLines += '            }'
+    $workerLines += '        }'
     $workerLines += "        Add-Content -Path `$logFile -Value ('[$WorkerName ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '] SCHRITT 1: Config Backup abgeschlossen')"
     $workerLines += "        Write-Host '$WorkerName`: SCHRITT 1: Config Backup abgeschlossen' -ForegroundColor Green"
     $workerLines += "        "
@@ -731,6 +740,15 @@ function New-WorkerScript {
     $workerLines += '                        $backupDir = Join-Path $logDir "OneView_Backup"'
     $workerLines += '                        if (!(Test-Path $backupDir)) { New-Item -ItemType Directory -Path $backupDir -Force | Out-Null }'
     $workerLines += '                        new-OVBackup -Location $backupDir -Force -Passphrase $securePassphrase -ErrorAction Stop'
+    $workerLines += '                        # OV 11.20+: Backup-Dateiname enthaelt Appliance-Hostname nicht mehr -> als Prefix anfuegen'
+    $workerLines += '                        $rcvFiles = @(Get-ChildItem -Path $backupDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -ne ".log" -and $_.Length -gt 0 })'
+    $workerLines += '                        if ($rcvFiles.Count -gt 0) {'
+    $workerLines += '                            $rcvFile = $rcvFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1'
+    $workerLines += '                            if ($rcvFile.Name -notlike "$Appliance*") {'
+    $workerLines += '                                $safeName = ($Appliance -replace ''[\\/:*?"<>|]'', ''_'')'
+    $workerLines += '                                try { Rename-Item -LiteralPath $rcvFile.FullName -NewName ("${safeName}_" + $rcvFile.Name) -ErrorAction Stop } catch { Write-Host ("WARNUNG: Backup-Datei konnte nicht umbenannt werden: " + $_.Exception.Message) -ForegroundColor Yellow }'
+    $workerLines += '                            }'
+    $workerLines += '                        }'
     $workerLines += "                        Write-Host '$WorkerName`: SCHRITT 3: Config Backup erfolgreich!' -ForegroundColor Green"
     $workerLines += "                        Add-Content -Path `$logFile -Value ('[$WorkerName ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '] SCHRITT 3: Config Backup nach Update erfolgreich')"
     $workerLines += "                        break"
@@ -894,6 +912,15 @@ function Invoke-ApplianceUpdate {
             $backupDir = Join-Path $logDir "OneView_Backup"
             if (!(Test-Path $backupDir)) { New-Item -ItemType Directory -Path $backupDir -Force | Out-Null }
             new-OVBackup -Location $backupDir -Force -Passphrase $securePassphrase
+            # OV 11.20+: Backup-Dateiname enthaelt Appliance-Hostname nicht mehr -> als Prefix anfuegen
+            $rcvFiles = @(Get-ChildItem -Path $backupDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -ne '.log' -and $_.Length -gt 0 })
+            if ($rcvFiles.Count -gt 0) {
+                $rcvFile = $rcvFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if ($rcvFile.Name -notlike "$Appliance*") {
+                    $safeName = ($Appliance -replace '[\\/:*?"<>|]', '_')
+                    try { Rename-Item -LiteralPath $rcvFile.FullName -NewName ("${safeName}_" + $rcvFile.Name) -ErrorAction Stop } catch { Write-Host "WARNUNG: Backup-Datei konnte nicht umbenannt werden: $($_.Exception.Message)" -ForegroundColor Yellow }
+                }
+            }
             Add-Content -Path $logFile -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] SCHRITT 1: Config Backup abgeschlossen"
             Write-Host "[$(Get-Date -Format 'HH:mm:ss')] SCHRITT 1: Config Backup abgeschlossen" -ForegroundColor Green
             $host.UI.RawUI.BackgroundColor = "DarkBlue"
@@ -983,6 +1010,15 @@ function Invoke-ApplianceUpdate {
                             $backupDir = Join-Path $logDir "OneView_Backup"
                             if (!(Test-Path $backupDir)) { New-Item -ItemType Directory -Path $backupDir -Force | Out-Null }
                             new-OVBackup -Location $backupDir -Force -Passphrase $securePassphrase -ErrorAction Stop
+                            # OV 11.20+: Backup-Dateiname enthaelt Appliance-Hostname nicht mehr -> als Prefix anfuegen
+                            $rcvFiles = @(Get-ChildItem -Path $backupDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -ne '.log' -and $_.Length -gt 0 })
+                            if ($rcvFiles.Count -gt 0) {
+                                $rcvFile = $rcvFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                                if ($rcvFile.Name -notlike "$Appliance*") {
+                                    $safeName = ($Appliance -replace '[\\/:*?"<>|]', '_')
+                                    try { Rename-Item -LiteralPath $rcvFile.FullName -NewName ("${safeName}_" + $rcvFile.Name) -ErrorAction Stop } catch { Write-Host "WARNUNG: Backup-Datei konnte nicht umbenannt werden: $($_.Exception.Message)" -ForegroundColor Yellow }
+                                }
+                            }
                             Write-Host "[$(Get-Date -Format 'HH:mm:ss')] SCHRITT 3: Config Backup erfolgreich!" -ForegroundColor Green
                             Add-Content -Path $logFile -Value "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] SCHRITT 3: Config Backup nach Update erfolgreich"
                             break

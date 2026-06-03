@@ -1,11 +1,17 @@
 #Requires -Version 7.0
 # ============================================================================
-#  HPE OneView Config-Backup – Kombiniert (OV 6.60 + OV 11.10)
-#  Parallel: OV 660 und OV 1000 laufen in eigenen Prozessen (Start-Job)
+#  HPE OneView Config-Backup – versionsuebergreifend (OV 6.60, 11.x, ...)
+#  Eine gemeinsame IP-Datei (Oneview.txt). Die OneView-Software-Version wird
+#  beim Start pro Appliance per /rest/version automatisch erkannt und das
+#  passende HPEOneView-PowerShell-Modul aus OneView_VersionMap.ps1 gewaehlt.
+#  Parallel: pro benoetigtem Modul ein eigener Start-Job (Modul-Isolation).
 # ============================================================================
 
 # Skriptordner ermitteln
 $scriptFolder = $PSScriptRoot
+
+# Versions-/Modul-Tabelle einbinden
+. (Join-Path $scriptFolder 'OneView_VersionMap.ps1')
 
 # =============================
 # Konsolenfenster ausblenden
@@ -40,7 +46,7 @@ Add-Type -AssemblyName System.Drawing
 # -----------------------------
 $form = New-Object System.Windows.Forms.Form
 $null = $form.Handle
-$form.Text = "© 2025 N.J. Airbus D&S - HPE OneView Config-Backup (OV 6.60 + 11.10)"
+$form.Text = "© 2025 N.J. Airbus D&S - HPE OneView Config-Backup (Auto-Version)"
 $form.Size = New-Object System.Drawing.Size(800,980)
 $form.StartPosition = "CenterScreen"
 
@@ -83,60 +89,31 @@ $textBoxPassphrase.UseSystemPasswordChar = $true
 $textBoxPassphrase.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
 $form.Controls.Add($textBoxPassphrase)
 
-# --- IP-Datei: OV 6.60 ---
-$labelIPList660 = New-Object System.Windows.Forms.Label
-$labelIPList660.Location = New-Object System.Drawing.Point(10,145)
-$labelIPList660.Size = New-Object System.Drawing.Size(130,20)
-$labelIPList660.Text = "OV 6.60 IP-Datei:"
-$labelIPList660.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
-$form.Controls.Add($labelIPList660)
+# --- IP-Datei: alle Appliances (Versionserkennung erfolgt automatisch) ---
+$labelIPList = New-Object System.Windows.Forms.Label
+$labelIPList.Location = New-Object System.Drawing.Point(10,160)
+$labelIPList.Size = New-Object System.Drawing.Size(130,20)
+$labelIPList.Text = "OneView IP-Datei:"
+$labelIPList.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$form.Controls.Add($labelIPList)
 
-$textBoxIPList660 = New-Object System.Windows.Forms.TextBox
-$textBoxIPList660.Location = New-Object System.Drawing.Point(150,145)
-$textBoxIPList660.Size = New-Object System.Drawing.Size(400,20)
-$textBoxIPList660.Text = (Join-Path $scriptFolder "Oneview_660.txt")
-$textBoxIPList660.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-$form.Controls.Add($textBoxIPList660)
+$textBoxIPList = New-Object System.Windows.Forms.TextBox
+$textBoxIPList.Location = New-Object System.Drawing.Point(150,160)
+$textBoxIPList.Size = New-Object System.Drawing.Size(400,20)
+$textBoxIPList.Text = (Join-Path $scriptFolder "Oneview.txt")
+$textBoxIPList.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$form.Controls.Add($textBoxIPList)
 
-$buttonBrowse660 = New-Object System.Windows.Forms.Button
-$buttonBrowse660.Location = New-Object System.Drawing.Point(560,145)
-$buttonBrowse660.Size = New-Object System.Drawing.Size(75,23)
-$buttonBrowse660.Text = "Browse..."
-$form.Controls.Add($buttonBrowse660)
-$buttonBrowse660.Add_Click({
+$buttonBrowseIPList = New-Object System.Windows.Forms.Button
+$buttonBrowseIPList.Location = New-Object System.Drawing.Point(560,160)
+$buttonBrowseIPList.Size = New-Object System.Drawing.Size(75,23)
+$buttonBrowseIPList.Text = "Browse..."
+$form.Controls.Add($buttonBrowseIPList)
+$buttonBrowseIPList.Add_Click({
     $ofd = New-Object System.Windows.Forms.OpenFileDialog
     $ofd.Filter = "Textdateien (*.txt)|*.txt|Alle Dateien (*.*)|*.*"
     if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $textBoxIPList660.Text = $ofd.FileName
-        Load-Appliances
-    }
-})
-
-# --- IP-Datei: OV 11.10 ---
-$labelIPList1110 = New-Object System.Windows.Forms.Label
-$labelIPList1110.Location = New-Object System.Drawing.Point(10,175)
-$labelIPList1110.Size = New-Object System.Drawing.Size(130,20)
-$labelIPList1110.Text = "OV 11.10 IP-Datei:"
-$labelIPList1110.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
-$form.Controls.Add($labelIPList1110)
-
-$textBoxIPList1110 = New-Object System.Windows.Forms.TextBox
-$textBoxIPList1110.Location = New-Object System.Drawing.Point(150,175)
-$textBoxIPList1110.Size = New-Object System.Drawing.Size(400,20)
-$textBoxIPList1110.Text = (Join-Path $scriptFolder "Oneview.txt")
-$textBoxIPList1110.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-$form.Controls.Add($textBoxIPList1110)
-
-$buttonBrowse1110 = New-Object System.Windows.Forms.Button
-$buttonBrowse1110.Location = New-Object System.Drawing.Point(560,175)
-$buttonBrowse1110.Size = New-Object System.Drawing.Size(75,23)
-$buttonBrowse1110.Text = "Browse..."
-$form.Controls.Add($buttonBrowse1110)
-$buttonBrowse1110.Add_Click({
-    $ofd = New-Object System.Windows.Forms.OpenFileDialog
-    $ofd.Filter = "Textdateien (*.txt)|*.txt|Alle Dateien (*.*)|*.*"
-    if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $textBoxIPList1110.Text = $ofd.FileName
+        $textBoxIPList.Text = $ofd.FileName
         Load-Appliances
     }
 })
@@ -168,21 +145,14 @@ $applianceList.CheckOnClick = $true
 $applianceList.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
 $form.Controls.Add($applianceList)
 
-# Funktion: Appliances aus IP-Dateien laden
+# Funktion: Appliances aus IP-Datei laden (Version wird beim Start automatisch erkannt)
 function Load-Appliances {
     $applianceList.Items.Clear()
-    $ipFile660 = $textBoxIPList660.Text
-    $ipFile1110 = $textBoxIPList1110.Text
-    if (-not [string]::IsNullOrWhiteSpace($ipFile660) -and (Test-Path $ipFile660)) {
-        $ips = @(Get-Content $ipFile660 | Where-Object { $_.Trim() -ne '' })
+    $ipFile = $textBoxIPList.Text
+    if (-not [string]::IsNullOrWhiteSpace($ipFile) -and (Test-Path $ipFile)) {
+        $ips = @(Get-Content $ipFile | Where-Object { $_.Trim() -ne '' -and -not $_.Trim().StartsWith('#') })
         foreach ($ip in $ips) {
-            $applianceList.Items.Add("$($ip.Trim())   (OV 6.60)", $true) | Out-Null
-        }
-    }
-    if (-not [string]::IsNullOrWhiteSpace($ipFile1110) -and (Test-Path $ipFile1110)) {
-        $ips = @(Get-Content $ipFile1110 | Where-Object { $_.Trim() -ne '' })
-        foreach ($ip in $ips) {
-            $applianceList.Items.Add("$($ip.Trim())   (OV 11.10)", $true) | Out-Null
+            $applianceList.Items.Add("$($ip.Trim())   (OV ?)", $true) | Out-Null
         }
     }
 }
@@ -305,32 +275,113 @@ $buttonStart.Add_Click({
         Write-Log "Der Ordner '$folderPath' existiert bereits."
     }
 
-    # Ausgewählte Appliances aus CheckedListBox lesen
-    $appliances660  = @()
-    $appliances1110 = @()
+    # Ausgewählte Appliances (reine IPs/Hostnamen, ohne Versions-Suffix) aus CheckedListBox lesen
+    $selectedAppliances = @()
+    $selectedIndices    = @()
     for ($i = 0; $i -lt $applianceList.Items.Count; $i++) {
         if ($applianceList.GetItemChecked($i)) {
             $itemText = $applianceList.Items[$i].ToString()
-            if ($itemText -match '\(OV 6\.60\)$') {
-                $appliances660 += ($itemText -replace '\s+\(OV 6\.60\)$','').Trim()
-            }
-            elseif ($itemText -match '\(OV 11\.10\)$') {
-                $appliances1110 += ($itemText -replace '\s+\(OV 11\.10\)$','').Trim()
+            # Suffix "(OV ...)" entfernen
+            $ip = ($itemText -replace '\s+\(OV[^\)]*\)\s*$','').Trim()
+            if ($ip) {
+                $selectedAppliances += $ip
+                $selectedIndices    += $i
             }
         }
     }
 
-    if ($appliances660.Count -eq 0 -and $appliances1110.Count -eq 0) {
+    if ($selectedAppliances.Count -eq 0) {
         [System.Windows.Forms.MessageBox]::Show("Bitte mindestens eine Appliance auswählen.", "Fehler",
             [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
         $buttonStart.Enabled = $true
         return
     }
 
+    # ----------------------------------------------------------------
+    # Versions-Auto-Erkennung pro Appliance + Gruppierung nach Modul
+    # ----------------------------------------------------------------
+    Write-Log "Erkenne OneView-Version pro Appliance..."
+    $statusLabel.Text = "Erkenne OneView-Version..."
+    $form.Refresh()
+
+    $applianceGroups = @{}   # Module -> @{ List=@(ip,...); Label='6.60' | '11.x' }
+    $unresolved      = @()
+    for ($k = 0; $k -lt $selectedAppliances.Count; $k++) {
+        $ip   = $selectedAppliances[$k]
+        $idx  = $selectedIndices[$k]
+        $info = Get-OvVersionInfo -Appliance $ip -TimeoutSec 10
+
+        if ($info.Module) {
+            $verLabel = if ($info.MajorMinor) { $info.MajorMinor } else { $info.SoftwareVersion }
+            # CheckedListBox-Eintrag mit echter Version aktualisieren (Suffix ersetzen)
+            $applianceList.Items[$idx] = "$ip   (OV $verLabel)"
+            $applianceList.SetItemChecked($idx, $true)
+
+            if (-not $applianceGroups.ContainsKey($info.Module)) {
+                $applianceGroups[$info.Module] = [PSCustomObject]@{
+                    Module = $info.Module
+                    Label  = $verLabel
+                    List   = @()
+                }
+            } else {
+                # Wenn bereits Liste fuer dieses Modul existiert und Label uneindeutig wird,
+                # Label generisch halten (z.B. "11.x" wenn 11.10 + 11.20 zusammen).
+                $existing = $applianceGroups[$info.Module]
+                if ($existing.Label -ne $verLabel) {
+                    $major = ($verLabel -split '\.')[0]
+                    $existing.Label = "$major.x"
+                }
+            }
+            $applianceGroups[$info.Module].List += $ip
+            Write-Log ("  {0,-25} -> OV {1}  (Modul {2})" -f $ip, $verLabel, $info.Module)
+        }
+        else {
+            $applianceList.Items[$idx] = "$ip   (OV ?)"
+            $unresolved += [PSCustomObject]@{ Appliance=$ip; Reason=$info.Error }
+            Write-Log ("  {0,-25} -> Version NICHT erkannt: {1}" -f $ip, $info.Error)
+        }
+    }
+
+    if ($unresolved.Count -gt 0) {
+        $msg = "Für folgende Appliance(s) konnte keine Version ermittelt werden und sie werden übersprungen:`n`n"
+        foreach ($u in $unresolved) { $msg += " - $($u.Appliance): $($u.Reason)`n" }
+        [System.Windows.Forms.MessageBox]::Show($msg, "Versionserkennung",
+            [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        # Übersprungene Appliances als Fehler in der Detail-Liste anzeigen
+        foreach ($u in $unresolved) {
+            $li = New-Object System.Windows.Forms.ListViewItem($u.Appliance)
+            $li.Name = $u.Appliance
+            $li.SubItems.Add('?') | Out-Null
+            $li.SubItems.Add('Übersprungen') | Out-Null
+            $li.SubItems.Add($u.Reason) | Out-Null
+            $detailedListView.Items.Add($li) | Out-Null
+        }
+    }
+
+    if ($applianceGroups.Count -eq 0) {
+        [System.Windows.Forms.MessageBox]::Show("Keine Appliance mit ermittelbarer Version - Backup wird abgebrochen.", "Fehler",
+            [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        $statusLabel.Text = "Bereit..."
+        $buttonStart.Enabled = $true
+        return
+    }
+
+    # Hashtable -> einfaches Array fuer Runspace-Uebergabe.
+    # Wichtig: List als FLACHES string[]-Array uebergeben - sonst wird beim
+    # spaeteren "-join '|'" daraus "System.Object[]".
+    $applianceGroupsArray = @()
+    foreach ($key in $applianceGroups.Keys) {
+        $g = $applianceGroups[$key]
+        $applianceGroupsArray += [PSCustomObject]@{
+            Module = [string]$g.Module
+            Label  = [string]$g.Label
+            List   = [string[]]@($g.List)
+        }
+    }
+
     $orchestratorBlock = {
         param(
-            [string[]]$appliances660,
-            [string[]]$appliances1110,
+            [object[]]$applianceGroups,
             [System.Management.Automation.PSCredential]$credential,
             [string]$baseBackupDir,
             [string]$folderPath,
@@ -342,7 +393,8 @@ $buttonStart.Add_Click({
         )
 
         try {
-        $totalAll = $appliances660.Count + $appliances1110.Count
+        $totalAll = 0
+        foreach ($g in $applianceGroups) { $totalAll += $g.List.Count }
         $counter  = 0
 
         # -----------------------------------------------------------
@@ -450,6 +502,19 @@ $buttonStart.Add_Click({
                             throw "Backup-Job abgeschlossen, aber keine Backup-Datei im Ordner '$currentFolder' gefunden."
                         }
                         $backupFile = $backupFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+                        # Ab OV 11.20 enthaelt der HPE-Backup-Dateiname den Appliance-Hostname nicht mehr.
+                        # Damit die Zuordnung der Datei zur Appliance erhalten bleibt, wird der Hostname als Prefix vorangestellt.
+                        if ($backupFile.Name -notlike "$appliance*") {
+                            $safeName = ($appliance -replace '[\\/:*?"<>|]', '_')
+                            $newName  = "${safeName}_$($backupFile.Name)"
+                            try {
+                                $renamed = Rename-Item -LiteralPath $backupFile.FullName -NewName $newName -PassThru -ErrorAction Stop
+                                $backupFile = Get-Item -LiteralPath $renamed.FullName
+                            } catch {
+                                [PSCustomObject]@{ Type='LOG'; Message="WARNUNG: Backup-Datei konnte nicht umbenannt werden: $($_.Exception.Message)" }
+                            }
+                        }
                         $sizeMB = [math]::Round($backupFile.Length / 1MB, 2)
 
                         [PSCustomObject]@{ Type='UPDATE'; Appliance=$appliance; Status='Erfolgreich'; Detail="Backup erstellt: $($backupFile.Name) ($sizeMB MB, Versuch $attempt)." }
@@ -477,24 +542,14 @@ $buttonStart.Add_Click({
 
         # -----------------------------------------------------------
         #  Jobs starten (eigene Prozesse = echte Modul-Isolation)
+        #  Pro benoetigtem HPEOneView-Modul ein eigener Job.
         # -----------------------------------------------------------
         $jobs = @()
-
-        # --- OV 6.60 Job ---
-        if ($appliances660.Count -gt 0) {
-            $list660Str = $appliances660 -join '|'
-            $jobs += Start-Job -Name 'OV 6.60' -ScriptBlock $batchScript -ArgumentList @(
-                $list660Str, "HPEOneView.660", "6.60",
-                $credential, $folderPath, $baseBackupDir, $date,
-                $passphrase, $logFilePath
-            )
-        }
-
-        # --- OV 11.10 Job ---
-        if ($appliances1110.Count -gt 0) {
-            $list1110Str = $appliances1110 -join '|'
-            $jobs += Start-Job -Name 'OV 11.10' -ScriptBlock $batchScript -ArgumentList @(
-                $list1110Str, "HPEOneView.1000", "11.10",
+        foreach ($g in $applianceGroups) {
+            if ($g.List.Count -eq 0) { continue }
+            $listStr = $g.List -join '|'
+            $jobs += Start-Job -Name ("OV " + $g.Label) -ScriptBlock $batchScript -ArgumentList @(
+                $listStr, $g.Module, $g.Label,
                 $credential, $folderPath, $baseBackupDir, $date,
                 $passphrase, $logFilePath
             )
@@ -739,8 +794,7 @@ $buttonStart.Add_Click({
     # Starte Orchestrator-Runspace
     $asyncPS = [powershell]::Create()
     $asyncPS.AddScript($orchestratorBlock) | Out-Null
-    $asyncPS.AddArgument($appliances660) | Out-Null
-    $asyncPS.AddArgument($appliances1110) | Out-Null
+    $asyncPS.AddArgument($applianceGroupsArray) | Out-Null
     $asyncPS.AddArgument($credential) | Out-Null
     $asyncPS.AddArgument($baseBackupDir) | Out-Null
     $asyncPS.AddArgument($folderPath) | Out-Null

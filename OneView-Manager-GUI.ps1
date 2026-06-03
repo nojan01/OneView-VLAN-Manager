@@ -109,11 +109,12 @@ $tblTools = New-Object System.Windows.Forms.TableLayoutPanel
 $tblTools.Location = New-Object System.Drawing.Point(10, 22)
 $tblTools.Size = New-Object System.Drawing.Size(748, 70)
 $tblTools.Anchor = [System.Windows.Forms.AnchorStyles]::Top -bor [System.Windows.Forms.AnchorStyles]::Left -bor [System.Windows.Forms.AnchorStyles]::Right
-$tblTools.ColumnCount = 3
+$tblTools.ColumnCount = 4
 $tblTools.RowCount = 2
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.34))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
-$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 33.33))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25))) | Out-Null
+$tblTools.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 25))) | Out-Null
 $tblTools.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 50))) | Out-Null
 $tblTools.RowStyles.Add((New-Object System.Windows.Forms.RowStyle([System.Windows.Forms.SizeType]::Percent, 50))) | Out-Null
 $grpTools.Controls.Add($tblTools)
@@ -144,12 +145,23 @@ $tblTools.Controls.Add($btnConfigBackup, 1, 0)
 $btnUserManager = New-Object System.Windows.Forms.Button
 $btnUserManager.Text = "User Manager"
 $btnUserManager.Dock = [System.Windows.Forms.DockStyle]::Fill
-$btnUserManager.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 3)
+$btnUserManager.Margin = New-Object System.Windows.Forms.Padding(3, 0, 3, 3)
 $btnUserManager.BackColor = [System.Drawing.Color]::FromArgb(0, 120, 120)
 $btnUserManager.ForeColor = [System.Drawing.Color]::White
 $btnUserManager.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnUserManager.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblTools.Controls.Add($btnUserManager, 2, 0)
+
+# Button: Firmware Manager (Reihe 1, Spalte 3)
+$btnFirmwareManager = New-Object System.Windows.Forms.Button
+$btnFirmwareManager.Text = "Firmware Manager"
+$btnFirmwareManager.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnFirmwareManager.Margin = New-Object System.Windows.Forms.Padding(3, 0, 0, 3)
+$btnFirmwareManager.BackColor = [System.Drawing.Color]::FromArgb(40, 100, 60)
+$btnFirmwareManager.ForeColor = [System.Drawing.Color]::White
+$btnFirmwareManager.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnFirmwareManager.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblTools.Controls.Add($btnFirmwareManager, 3, 0)
 
 # Button: Alerts (Reihe 2, Spalte 0)
 $btnAlerts = New-Object System.Windows.Forms.Button
@@ -173,7 +185,18 @@ $btnEFuse.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnEFuse.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblTools.Controls.Add($btnEFuse, 1, 1)
 
-# Button: Hilfe (README) (Reihe 2, Spalte 2)
+# Button: Server Info (Reihe 2, Spalte 2)
+$btnServerInfo = New-Object System.Windows.Forms.Button
+$btnServerInfo.Text = "Server Info"
+$btnServerInfo.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnServerInfo.Margin = New-Object System.Windows.Forms.Padding(3, 3, 3, 0)
+$btnServerInfo.BackColor = [System.Drawing.Color]::FromArgb(60, 90, 160)
+$btnServerInfo.ForeColor = [System.Drawing.Color]::White
+$btnServerInfo.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnServerInfo.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblTools.Controls.Add($btnServerInfo, 2, 1)
+
+# Button: Hilfe (README) (Reihe 2, Spalte 3)
 $btnHelp = New-Object System.Windows.Forms.Button
 $btnHelp.Text = "Hilfe ?"
 $btnHelp.Dock = [System.Windows.Forms.DockStyle]::Fill
@@ -182,7 +205,7 @@ $btnHelp.BackColor = [System.Drawing.Color]::FromArgb(80, 80, 80)
 $btnHelp.ForeColor = [System.Drawing.Color]::White
 $btnHelp.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnHelp.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$tblTools.Controls.Add($btnHelp, 2, 1)
+$tblTools.Controls.Add($btnHelp, 3, 1)
 
 # ============================================================================
 #  GroupBox: Anmeldeinformationen
@@ -4030,6 +4053,42 @@ $btnEFuse.Add_Click({
     }
     Write-GUILog "Starte Synergy eFuse Tool…" -Color ([System.Drawing.Color]::Orange)
     Start-Process pwsh -ArgumentList "-NoProfile -File `"$eFuseScript`""
+})
+
+# ============================================================================
+#  Button-Event: Firmware Manager (eigenständiges Tool)
+# ============================================================================
+$btnFirmwareManager.Add_Click({
+    $firmwareManagerScript = Join-Path $scriptDir "Oneview_FirmwareManager\OneView-FirmwareManager-GUI.ps1"
+    if (-not (Test-Path $firmwareManagerScript)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Firmware-Manager-Script nicht gefunden:`n$firmwareManagerScript",
+            "Datei fehlt",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+    Write-GUILog "Starte Firmware Manager Tool…" -Color ([System.Drawing.Color]::Orange)
+    Start-Process pwsh -ArgumentList "-NoProfile -File `"$firmwareManagerScript`""
+})
+
+# ============================================================================
+#  Button-Event: Server Info (eigenständiges Tool)
+# ============================================================================
+$btnServerInfo.Add_Click({
+    $serverInfoScript = Join-Path $scriptDir "Oneview_ServerInfo\OneView-ServerInfo-GUI.ps1"
+    if (-not (Test-Path $serverInfoScript)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Server-Info-Script nicht gefunden:`n$serverInfoScript",
+            "Datei fehlt",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+    Write-GUILog "Starte Server Info Tool…" -Color ([System.Drawing.Color]::Orange)
+    Start-Process pwsh -ArgumentList "-NoProfile -File `"$serverInfoScript`""
 })
 
 # ============================================================================

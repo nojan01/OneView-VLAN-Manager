@@ -73,8 +73,7 @@ function Load-Config {
         try { return Get-Content -Path $configPath -Raw -Encoding UTF8 | ConvertFrom-Json } catch {}
     }
     return [PSCustomObject]@{
-        IPFile660             = (Join-Path $scriptDir '..\Oneview_660.txt')
-        IPFile1110            = (Join-Path $scriptDir '..\Oneview.txt')
+        IPFile                = (Join-Path $scriptDir '..\Oneview.txt')
         BackupBaseDir         = (Join-Path $scriptDir 'OneView_Backup')
         LocalRetentionDays    = 5
         TransferEnabled       = $false
@@ -161,19 +160,17 @@ $grpPathsIP.Location = New-Object System.Drawing.Point(10, 160)
 $grpPathsIP.Size = New-Object System.Drawing.Size(700, 170)
 $form.Controls.Add($grpPathsIP)
 
-$lbl660 = New-Object System.Windows.Forms.Label; $lbl660.Text = "OV 6.60 IP-Datei:"; $lbl660.Location = "10,28"; $lbl660.Size = "130,20"
-$grpPathsIP.Controls.Add($lbl660)
-$txtIP660 = New-Object System.Windows.Forms.TextBox; $txtIP660.Location = "145,25"; $txtIP660.Size = "440,22"
-$grpPathsIP.Controls.Add($txtIP660)
-$btnIP660 = New-Object System.Windows.Forms.Button; $btnIP660.Text = "..."; $btnIP660.Location = "590,23"; $btnIP660.Size = "60,26"
-$grpPathsIP.Controls.Add($btnIP660)
+$lblIP = New-Object System.Windows.Forms.Label; $lblIP.Text = "OneView IP-Datei:"; $lblIP.Location = "10,28"; $lblIP.Size = "130,20"
+$grpPathsIP.Controls.Add($lblIP)
+$txtIP = New-Object System.Windows.Forms.TextBox; $txtIP.Location = "145,25"; $txtIP.Size = "440,22"
+$grpPathsIP.Controls.Add($txtIP)
+$btnIP = New-Object System.Windows.Forms.Button; $btnIP.Text = "..."; $btnIP.Location = "590,23"; $btnIP.Size = "60,26"
+$grpPathsIP.Controls.Add($btnIP)
 
-$lbl1110 = New-Object System.Windows.Forms.Label; $lbl1110.Text = "OV 11.10 IP-Datei:"; $lbl1110.Location = "10,58"; $lbl1110.Size = "130,20"
-$grpPathsIP.Controls.Add($lbl1110)
-$txtIP1110 = New-Object System.Windows.Forms.TextBox; $txtIP1110.Location = "145,55"; $txtIP1110.Size = "440,22"
-$grpPathsIP.Controls.Add($txtIP1110)
-$btnIP1110 = New-Object System.Windows.Forms.Button; $btnIP1110.Text = "..."; $btnIP1110.Location = "590,53"; $btnIP1110.Size = "60,26"
-$grpPathsIP.Controls.Add($btnIP1110)
+$lblIPHint = New-Object System.Windows.Forms.Label
+$lblIPHint.Text = "(Versionserkennung pro Appliance erfolgt automatisch beim Lauf)"
+$lblIPHint.Location = "145,52"; $lblIPHint.Size = "500,18"; $lblIPHint.ForeColor = 'Gray'
+$grpPathsIP.Controls.Add($lblIPHint)
 
 $lblDir = New-Object System.Windows.Forms.Label; $lblDir.Text = "Backup-Zielordner:"; $lblDir.Location = "10,88"; $lblDir.Size = "130,20"
 $grpPathsIP.Controls.Add($lblDir)
@@ -189,21 +186,13 @@ $grpPathsIP.Controls.Add($numRet)
 $lblRetHint = New-Object System.Windows.Forms.Label; $lblRetHint.Text = "(0 = keine Bereinigung)"; $lblRetHint.Location = "240,118"; $lblRetHint.Size = "200,20"; $lblRetHint.ForeColor = 'Gray'
 $grpPathsIP.Controls.Add($lblRetHint)
 
-$btnIP660.Add_Click({
+$btnIP.Add_Click({
         $ofd = New-Object System.Windows.Forms.OpenFileDialog
         $ofd.Filter = "Textdateien (*.txt)|*.txt|Alle Dateien (*.*)|*.*"
-        if ($txtIP660.Text -and (Test-Path (Split-Path $txtIP660.Text -Parent -ErrorAction SilentlyContinue))) {
-            $ofd.InitialDirectory = Split-Path $txtIP660.Text -Parent
+        if ($txtIP.Text -and (Test-Path (Split-Path $txtIP.Text -Parent -ErrorAction SilentlyContinue))) {
+            $ofd.InitialDirectory = Split-Path $txtIP.Text -Parent
         }
-        if ($ofd.ShowDialog() -eq 'OK') { $txtIP660.Text = $ofd.FileName }
-    })
-$btnIP1110.Add_Click({
-        $ofd = New-Object System.Windows.Forms.OpenFileDialog
-        $ofd.Filter = "Textdateien (*.txt)|*.txt|Alle Dateien (*.*)|*.*"
-        if ($txtIP1110.Text -and (Test-Path (Split-Path $txtIP1110.Text -Parent -ErrorAction SilentlyContinue))) {
-            $ofd.InitialDirectory = Split-Path $txtIP1110.Text -Parent
-        }
-        if ($ofd.ShowDialog() -eq 'OK') { $txtIP1110.Text = $ofd.FileName }
+        if ($ofd.ShowDialog() -eq 'OK') { $txtIP.Text = $ofd.FileName }
     })
 $btnBaseDir.Add_Click({
         $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -483,8 +472,13 @@ $btnClose.Add_Click({ $form.Close() })
 # Config in GUI laden
 # ---------------------------------------------------------------------------
 $config = Load-Config
-$txtIP660.Text = [string]$config.IPFile660
-$txtIP1110.Text = [string]$config.IPFile1110
+# Backwaerts-Kompatibilitaet: alte Konfigschluessel IPFile660/IPFile1110 in IPFile uebernehmen
+$ipFromConfig = [string]$config.IPFile
+if (-not $ipFromConfig) {
+    if ($config.IPFile1110) { $ipFromConfig = [string]$config.IPFile1110 }
+    elseif ($config.IPFile660) { $ipFromConfig = [string]$config.IPFile660 }
+}
+$txtIP.Text = $ipFromConfig
 $txtBaseDir.Text = [string]$config.BackupBaseDir
 $numRet.Value = if ($null -ne $config.LocalRetentionDays) { [int]$config.LocalRetentionDays } else { 5 }
 
@@ -615,8 +609,7 @@ function Save-AllConfig {
     }
 
     $newCfg = [PSCustomObject]@{
-        IPFile660             = $txtIP660.Text.Trim()
-        IPFile1110            = $txtIP1110.Text.Trim()
+        IPFile                = $txtIP.Text.Trim()
         BackupBaseDir         = $txtBaseDir.Text.Trim()
         LocalRetentionDays    = [int]$numRet.Value
         TransferEnabled       = [bool]$chkTransfer.Checked

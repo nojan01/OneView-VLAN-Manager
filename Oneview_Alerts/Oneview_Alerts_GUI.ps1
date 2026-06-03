@@ -42,6 +42,11 @@ $global:logOutput = @()
 $global:errorLog = @()
 $script:isBusy = $false
 $script:knownIssues = @()
+# Zwischenspeicher für Anmeldeinformationen (SecureString-basiert, bleibt im Speicher
+# verschlüsselt). Wird benötigt, damit der Auto-Refresh-Timer ohne erneute Eingabe
+# arbeiten kann. Klartext-Passwort wird trotzdem nach der ersten Eingabe aus dem
+# UI-Puffer entfernt.
+$script:credential = $null
 
 function Get-KnownIssues {
     try {
@@ -553,16 +558,30 @@ function Invoke-Alerts {
         $global:logOutput += "#####################################################"
         $global:logOutput += ""
     
-        if ([string]::IsNullOrWhiteSpace($txtUsername.Text) -or [string]::IsNullOrWhiteSpace($txtPassword.Text)) {
+        # Anmeldeinformationen ermitteln:
+        #  - Wenn der Benutzer Username + Passwort eingegeben hat, wird ein neuer
+        #    PSCredential erzeugt und für spätere Auto-Refresh-Läufe zwischengespeichert.
+        #  - Andernfalls wird der zwischengespeicherte Credential (SecureString) verwendet.
+        #  - Das Klartext-Passwort wird in jedem Fall sofort aus dem UI-Puffer entfernt,
+        #    sodass es nicht dauerhaft als Klartext im Speicher liegt.
+        if (-not [string]::IsNullOrWhiteSpace($txtPassword.Text)) {
+            if ([string]::IsNullOrWhiteSpace($txtUsername.Text)) {
+                [System.Windows.Forms.MessageBox]::Show("Bitte Benutzername und Kennwort eingeben.", "Fehlende Anmeldeinformationen",
+                    [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+                return
+            }
+            $secPassword = ConvertTo-SecureString $txtPassword.Text -AsPlainText -Force
+            $script:credential = New-Object System.Management.Automation.PSCredential($txtUsername.Text, $secPassword)
+            # Klartext-Passwort sofort aus dem UI-Puffer entfernen
+            $txtPassword.Text = ''
+            Remove-Variable secPassword -ErrorAction SilentlyContinue
+        }
+        elseif ($null -eq $script:credential) {
             [System.Windows.Forms.MessageBox]::Show("Bitte Benutzername und Kennwort eingeben.", "Fehlende Anmeldeinformationen",
                 [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
             return
         }
-        $secPassword = ConvertTo-SecureString $txtPassword.Text -AsPlainText -Force
-        $credential = New-Object System.Management.Automation.PSCredential($txtUsername.Text, $secPassword)
-        # Klartext-Passwort sofort aus dem UI-Puffer entfernen
-        $txtPassword.Text = ''
-        Remove-Variable secPassword -ErrorAction SilentlyContinue
+        $credential = $script:credential
     
         $applianceFiles = @()
         switch ($cmbFile.SelectedItem) {
@@ -1060,6 +1079,8 @@ $timer.Start()
 $form.Add_FormClosing({
         try { if ($timer) { $timer.Stop(); $timer.Dispose() } } catch {}
         try { if ($trafficTimer) { $trafficTimer.Stop(); $trafficTimer.Dispose() } } catch {}
+        # Zwischengespeicherte Anmeldeinformationen beim Schließen aus dem Speicher entfernen
+        try { $script:credential = $null } catch {}
     })
 
 # Intervall dynamisch bei Änderung der NumericUpDown anpassen (sofort wirksam)
