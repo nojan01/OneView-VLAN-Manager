@@ -1,0 +1,7 @@
+# OneView-Appliances fuer den Import der iLO-Adressen (Rackmount Firmware Tool)
+# Eine Appliance (Hostname oder IP) pro Zeile. Leerzeilen und Zeilen ab '#' werden ignoriert.
+# Das Tool liest 'server-hardware' aus und uebernimmt iLO-Adresse + Modell der monitored Server.
+#
+# Beispiele:
+# oneview01.example.local
+# 10.0.0.10

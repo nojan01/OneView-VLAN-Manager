@@ -1,0 +1,14 @@
+# Serverliste fuer das Rackmount Firmware Update Tool
+# ---------------------------------------------------
+# Diese Datei wird vom Tool AUTOMATISCH aus OneView erzeugt
+# ("Server aus OneView laden") und enthaelt iLO-Adresse, Servername, Modell,
+# Generation und Scope der monitored Server. Sie kann ueber "Aus Servers.txt laden"
+# offline wieder eingelesen werden (inkl. Servertyp-/Scope-Filter).
+#
+# Format: ilo[;user;pass]    # Name=...; Modell=...; Gen=NN; Scope=...
+# Leerzeilen und Zeilen, die mit '#' beginnen, werden ignoriert.
+#
+# Beispiele (werden beim naechsten OneView-Import ueberschrieben):
+10.10.20.31    # Name=esxprod01; Modell=ProLiant DL360 Gen10; Gen=10; Scope=ESX, VDI
+10.10.20.32    # Name=winapp02; Modell=ProLiant DL380a Gen11; Gen=11; Scope=Windows
+# ilo-srv99.domain.local;fwadmin;Kennwort    # Name=linux09; Modell=ProLiant DL360 Gen10; Gen=10; Scope=Linux
