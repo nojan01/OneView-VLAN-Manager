@@ -123,7 +123,7 @@ Voraussetzung: Installiertes HPE OneView PowerShell-Modul (`Install-Module HPEOn
 
 ## Rackmount Firmware Update (Gen10+, iLO Redfish)
 
-Das Tool [Oneview_RackmountFirmware/OneView-RackmountFirmware-GUI.ps1](Oneview_RackmountFirmware/OneView-RackmountFirmware-GUI.ps1) aktualisiert die Firmware von **standalone HPE ProLiant Rackmount-Servern ab Gen10** (Gen10 / Gen10 Plus / Gen11 / Gen12) **direkt über die iLO-Redfish-API** – ohne HPE-PowerShell-Module.
+Das Tool [Oneview_FirmwareUpdateManager/OneView-RackmountFirmware-GUI.ps1](Oneview_FirmwareUpdateManager/OneView-RackmountFirmware-GUI.ps1) aktualisiert die Firmware von **standalone HPE ProLiant Rackmount-Servern ab Gen10** (Gen10 / Gen10 Plus / Gen11 / Gen12) **direkt über die iLO-Redfish-API** – ohne HPE-PowerShell-Module.
 
 Hintergrund: Die Server sind in OneView nur im **Monitoring-Mode** eingebunden. OneView kann monitored Server **nicht** flashen (das erfordert Managed-Mode mit Server-Profil). Daher wird hier direkt gegen das iLO geflasht – der von HPE empfohlene Weg für Standalone-Updates über `MultipartHttpPushUri`.
 
@@ -135,10 +135,10 @@ Funktionen:
   - **Ordner** mit mehreren `.fwpkg` (werden pro Server nacheinander geflasht)
   - **Basisverzeichnis mit Typ-Unterordnern** – je Server wird das Modell **live am iLO** ermittelt und automatisch der passende Typ-Ordner zugeordnet (siehe unten). Ideal für gemischte Chargen.
   - … auf einem Einzelserver **oder einer ganzen Charge parallel** (einstellbare Parallelität, Standard 8)
-- **Server-Quelle ist OneView**: Das Tool liest `server-hardware` der monitored Appliances aus und übernimmt **iLO-Adresse, Modell und Scope** automatisch (Filter „nur Gen10+"). Die Serverliste ([Servers.txt](Oneview_RackmountFirmware/Servers.txt)) wird dabei erzeugt und kann offline wieder geladen werden.
+- **Server-Quelle ist OneView**: Das Tool liest `server-hardware` der monitored Appliances aus und übernimmt **iLO-Adresse, Modell und Scope** automatisch (Filter „nur Gen10+"). Die Serverliste ([Servers.txt](Oneview_FirmwareUpdateManager/Servers.txt)) wird dabei erzeugt und kann offline wieder geladen werden.
 - **Auswahl nach Servertyp und nach Scope**: Zwei Dropdowns filtern die angezeigten Server nach **Modell** (z. B. DL360 Gen10) und nach **OneView-Scope** (ESX, Linux, Windows, VDI …); zusätzlich Textsuche auf die iLO-Adresse.
 - **Optionale SHA-256-Verifikation** der Firmware-Datei vor dem Upload (nur Einzeldatei)
-- **Live-Fortschritt** pro Server (Upload + Flash) in einer Tabelle, konsolidiertes Log unter `Oneview_RackmountFirmware/Logs/`
+- **Live-Fortschritt** pro Server (Upload + Flash) in einer Tabelle, konsolidiertes Log unter `Oneview_FirmwareUpdateManager/Logs/`
 
 Sicherheit:
 
@@ -150,9 +150,9 @@ Sicherheit:
 
 Die Serverliste wird **immer aus OneView** erzeugt:
 
-- **Appliance-Liste**: Textdatei mit einer OneView-Appliance pro Zeile ([Oneview_RackmountFirmware/Oneview.txt](Oneview_RackmountFirmware/Oneview.txt)).
+- **Appliance-Liste**: Textdatei mit einer OneView-Appliance pro Zeile ([Oneview_FirmwareUpdateManager/Oneview.txt](Oneview_FirmwareUpdateManager/Oneview.txt)).
 - **„Server aus OneView laden"**: Mit den OneView-Credentials liest das Tool `server-hardware`, die Scopes (`/rest/scopes`) und die Scope-Zuordnung (`/rest/index/resources`) aus und übernimmt **iLO-Adresse, Modell, Generation und Scope** jedes monitored Servers.
-- Das Ergebnis wird automatisch nach [Servers.txt](Oneview_RackmountFirmware/Servers.txt) geschrieben (Format `ilo    # Modell=…; Gen=NN; Scope=…`) und kann über **„Aus Servers.txt laden"** offline – inkl. Servertyp-/Scope-Filter – wieder eingelesen werden.
+- Das Ergebnis wird automatisch nach [Servers.txt](Oneview_FirmwareUpdateManager/Servers.txt) geschrieben (Format `ilo    # Modell=…; Gen=NN; Scope=…`) und kann über **„Aus Servers.txt laden"** offline – inkl. Servertyp-/Scope-Filter – wieder eingelesen werden.
 - **Auswahl**: Dropdown **Servertyp** (Modell) + Dropdown **Scope** + Textsuche; danach „Alle"/„Keine" und Häkchen setzen.
 
 ### Firmware-Bereitstellung & Typ-Verzeichnisse
@@ -208,7 +208,7 @@ OneView-VLAN-Manager/
 │   ├── Oneview_Alerts_GUI.ps1
 │   ├── Oneview_Alerts_Scheduled.ps1
 │   └── Oneview_Alerts_TaskConfig_GUI.ps1
-├── Oneview_RackmountFirmware/         # Eigenständiges Tool: Rackmount Firmware Update (Gen10+, iLO Redfish)
+├── Oneview_FirmwareUpdateManager/         # Eigenständiges Tool: Rackmount Firmware Update (Gen10+, iLO Redfish)
 │   ├── OneView-RackmountFirmware-GUI.ps1
 │   └── Servers.txt
 └── Synergy_eFuse/                     # Eigenständiges Tool: Synergy eFuse

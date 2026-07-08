@@ -132,6 +132,20 @@ function ILO-GetSystemInfo {
     $gen = 0
     if ($model -match '(?i)Gen(\d+)') { $gen = [int]$Matches[1] }
     $serial = "$($sys.SerialNumber)"
+    # Aktive + Backup(Redundant)-System-ROM-Version direkt aus der
+    # ComputerSystem-Ressource (Oem.Hpe.Bios). WICHTIG: Die iLO-Overview liest
+    # genau diese Felder - anders als das FirmwareInventory zeigt 'Backup' nach
+    # einem Online-Flash SOFORT die frisch in die Redundant-ROM geschriebene,
+    # noch nicht per Reboot aktivierte Version. Damit laesst sich ein bereits
+    # geflashtes, aber noch nicht aktiviertes BIOS iLO-nativ erkennen.
+    $biosCur = ''; $biosBak = ''
+    try {
+        $bios = $sys.Oem.Hpe.Bios
+        if ($bios) {
+            if ($bios.Current -and $bios.Current.VersionString) { $biosCur = "$($bios.Current.VersionString)" }
+            if ($bios.Backup  -and $bios.Backup.VersionString)  { $biosBak = "$($bios.Backup.VersionString)" }
+        }
+    } catch {}
     # iLO-Generation aus Manager ableiten
     $iloGen = 0
     try {
@@ -139,7 +153,7 @@ function ILO-GetSystemInfo {
         $fw = "$($mgr.FirmwareVersion)"   # z.B. "iLO 5 v3.09" / "iLO 6 v1.64"
         if ($fw -match '(?i)iLO\s*(\d+)') { $iloGen = [int]$Matches[1] }
     } catch {}
-    @{ Model = $model; Gen = $gen; Serial = $serial; iLO = $iloGen }
+    @{ Model = $model; Gen = $gen; Serial = $serial; iLO = $iloGen; BiosCurrent = $biosCur; BiosBackup = $biosBak }
 }
 
 # Liest das Firmware-Inventar (Name -> Version). Liefert Array von @{ Name; Version }
@@ -343,6 +357,10 @@ function ILO-WaitForRepository {
         [scriptblock]$ProgressCb = $null
     )
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    # Ein noch anstehender 'Error'-Rest eines VORHERIGEN Vorgangs soll unseren
+    # neuen Upload nicht sofort abbrechen: bis zu dieser Frist auf den Start
+    # (Uploading/Verifying/Writing) warten, bevor 'Error' als echter Fehler zaehlt.
+    $graceDeadline = (Get-Date).AddSeconds(30)
     $lastPct = -1
     $sawActive = $false
     while ((Get-Date) -lt $deadline) {
@@ -354,7 +372,10 @@ function ILO-WaitForRepository {
         }
         switch -Regex ($state) {
             '^(Uploading|Verifying|Writing)$' { $sawActive = $true; Start-Sleep -Seconds 3 }
-            '^Error$'                         { throw "iLO meldet Repository-State 'Error'" }
+            '^Error$' {
+                if ($sawActive -or (Get-Date) -gt $graceDeadline) { throw "iLO meldet Repository-State 'Error'" }
+                Start-Sleep -Seconds 3
+            }
             '^(Complete|Idle|)$' {
                 # Kurz gegenpruefen, damit ein noch nicht gestarteter Schreibvorgang
                 # nicht faelschlich als 'fertig' gilt.
@@ -367,6 +388,31 @@ function ILO-WaitForRepository {
         }
     }
     throw "Timeout nach $TimeoutSec s - Repository-Upload nicht bestaetigt"
+}
+
+# Sucht im iLO ComponentRepository nach einem Eintrag, dessen Filename zu
+# $ComponentFileName passt (exakt, sonst per Teilstring). Liefert das gematchte
+# Member-Objekt (mit .Filename und @odata.id) oder $null. Nutzt $expand, faellt
+# sonst auf Einzel-Abruf der Member-URIs zurueck. Wird genutzt, um bei einem
+# WIEDERHOLTEN Lauf zu erkennen, dass eine deferred-Komponente bereits im
+# Repository liegt (erneuter Upload wuerde den UpdateService in 'Error' versetzen).
+function ILO-FindRepositoryComponent {
+    param([string]$Ilo,[string]$Token,[string]$ComponentFileName)
+    foreach ($repoPath in @('/redfish/v1/UpdateService/ComponentRepository/?$expand=.', '/redfish/v1/UpdateService/ComponentRepository/')) {
+        try {
+            $repo = ILO-Get -Ilo $Ilo -Token $Token -Path $repoPath
+            $members = @($repo.Members)
+            if ($members.Count -and -not ($members[0].PSObject.Properties.Name -contains 'Filename')) {
+                $full = @()
+                foreach ($ref in $members) { $u = $ref.'@odata.id'; if ($u) { try { $full += ILO-Get -Ilo $Ilo -Token $Token -Path $u } catch {} } }
+                $members = $full
+            }
+            $match = $members | Where-Object { "$($_.Filename)" -ieq $ComponentFileName } | Select-Object -First 1
+            if (-not $match) { $match = $members | Where-Object { "$($_.Filename)" -like "*$ComponentFileName*" -or $ComponentFileName -like "*$($_.Filename)*" } | Select-Object -First 1 }
+            if ($match) { return $match }
+        } catch {}
+    }
+    return $null
 }
 
 # Liest die iLO UpdateTaskQueue aus und liefert je Task ein Objekt
@@ -432,24 +478,10 @@ function ILO-CreateUpdateTask {
 
     # Den EXAKTEN Repository-Dateinamen ermitteln: iLO nutzt den Filename als
     # eindeutigen Schluessel; der Task muss genau diesen Namen referenzieren -
-    # sonst wird kein Task angelegt (POST evtl. trotzdem 2xx). Erst mit $expand,
-    # dann als Fallback ohne $expand (Member-URIs einzeln laden).
-    $resolved = $false
-    foreach ($repoPath in @('/redfish/v1/UpdateService/ComponentRepository/?$expand=.', '/redfish/v1/UpdateService/ComponentRepository/')) {
-        try {
-            $repo = ILO-Get -Ilo $Ilo -Token $Token -Path $repoPath
-            $members = @($repo.Members)
-            if ($members.Count -and -not ($members[0].PSObject.Properties.Name -contains 'Filename')) {
-                $full = @()
-                foreach ($ref in $members) { $u = $ref.'@odata.id'; if ($u) { try { $full += ILO-Get -Ilo $Ilo -Token $Token -Path $u } catch {} } }
-                $members = $full
-            }
-            $match = $members | Where-Object { "$($_.Filename)" -ieq $ComponentFileName } | Select-Object -First 1
-            if (-not $match) { $match = $members | Where-Object { "$($_.Filename)" -like "*$ComponentFileName*" -or $ComponentFileName -like "*$($_.Filename)*" } | Select-Object -First 1 }
-            if ($match -and $match.Filename) { $ComponentFileName = "$($match.Filename)"; $resolved = $true; break }
-        } catch {}
-    }
-    if (-not $resolved) { & $say "  WARN: '$ComponentFileName' nicht eindeutig im iLO-Repository gefunden - lege Task trotzdem mit diesem Namen an." }
+    # sonst wird kein Task angelegt (POST evtl. trotzdem 2xx).
+    $match = ILO-FindRepositoryComponent -Ilo $Ilo -Token $Token -ComponentFileName $ComponentFileName
+    if ($match -and $match.Filename) { $ComponentFileName = "$($match.Filename)" }
+    else { & $say "  WARN: '$ComponentFileName' nicht eindeutig im iLO-Repository gefunden - lege Task trotzdem mit diesem Namen an." }
 
     # Task-Name muss eindeutig sein UND wird Teil der iLO-Task-URI -> nur
     # URI-sichere Zeichen (keine Leerzeichen/Punkte), sonst 400 Bad Request.
@@ -463,6 +495,16 @@ function ILO-CreateUpdateTask {
     # Bestehende Tasks merken -> hinterher pruefen, ob unserer NEU dazukam.
     $before = @(ILO-GetUpdateTaskQueue -Ilo $Ilo -Token $Token -QueueUri $queueUri)
     $beforeNames = @($before | ForEach-Object { $_.Name })
+
+    # IDEMPOTENZ: Existiert bereits ein Task fuer genau diese Datei (z.B. aus einem
+    # frueheren, noch nicht per Reboot aktivierten Lauf)? Dann ist nichts zu tun -
+    # ein erneuter POST wuerde nur ein Duplikat erzeugen bzw. abgelehnt werden.
+    $already = $before | Where-Object { "$($_.Filename)" -ieq $ComponentFileName } | Select-Object -First 1
+    if ($already) {
+        & $say "  Task fuer '$ComponentFileName' ist bereits in der Queue - kein erneuter POST noetig."
+        if ($already.Uri) { return "$($already.Uri)" }
+        return ''
+    }
 
     # Payload-Varianten in Reihenfolge der Zuverlaessigkeit:
     #  - Feldname 'Filename' zuerst (iLO 5/6/7 laut HPE-Referenz), 'Component' als
@@ -771,6 +813,80 @@ function Get-NormFwVersion {
     if (-not $m.Success) { $m = [regex]::Match("$V", '\d+') }
     if (-not $m.Success) { return ("$V".Trim().ToLower()) }
     return (($m.Value -split '\.') | ForEach-Object { [int]$_ }) -join '.'
+}
+
+# ─────────────────────────────────────────
+# Lokaler Marker fuer bereits geflashte, aber noch NICHT per Reboot
+# aktivierte Komponenten (v.a. BIOS/System ROM).
+# Hintergrund: HPE iLO schreibt ein Online-BIOS-Update in die Redundant/
+# Backup-ROM und aktiviert es erst beim naechsten Reboot/POST. Das
+# FirmwareInventory (Redfish) meldet die neue Version - weder unter
+# 'System ROM' noch unter 'Redundant System ROM' - erst NACH dem Reboot.
+# Ein zweiter Update-Lauf VOR dem Reboot wuerde den bereits erfolgten
+# Flash daher nicht erkennen und unnoetig erneut flashen. Wir merken den
+# Flash deshalb lokal (StagedFlashes.json, je Server-Seriennummer + Typ).
+# Der Marker ist selbstheilend: sobald die Zielversion aktiv im Inventar
+# erscheint (Reboot erfolgt), wird er entfernt.
+function Get-StagedFlashPath {
+    param([string]$StateDir)
+    if (-not $StateDir) { $StateDir = $env:TEMP }
+    Join-Path $StateDir 'StagedFlashes.json'
+}
+function Read-StagedFlashes {
+    param([string]$StateDir)
+    $path = Get-StagedFlashPath -StateDir $StateDir
+    if (-not (Test-Path -LiteralPath $path)) { return @() }
+    try {
+        $raw = Get-Content -LiteralPath $path -Raw -ErrorAction Stop
+        if (-not $raw -or -not $raw.Trim()) { return @() }
+        return @($raw | ConvertFrom-Json -ErrorAction Stop)
+    } catch { return @() }
+}
+function Test-StagedFlash {
+    # $true, wenn fuer (Serial, Kind) bereits ein Flash mit derselben
+    # normalisierten Zielversion vorgemerkt ist.
+    param([string]$StateDir,[string]$Serial,[string]$Kind,[string]$TargetNorm)
+    if (-not $Serial -or -not $Kind -or -not $TargetNorm) { return $false }
+    $mtx = New-Object System.Threading.Mutex($false,'Global\OV_RackmountFw_StagedFlash')
+    try { [void]$mtx.WaitOne() } catch {}
+    try {
+        foreach ($e in (Read-StagedFlashes -StateDir $StateDir)) {
+            if ("$($e.Serial)" -ieq $Serial -and "$($e.Kind)" -ieq $Kind -and "$($e.TargetNorm)" -eq $TargetNorm) { return $true }
+        }
+        return $false
+    } finally { try { [void]$mtx.ReleaseMutex() } catch {}; $mtx.Dispose() }
+}
+function Set-StagedFlash {
+    # Legt/aktualisiert den Marker fuer (Serial, Kind) auf die Zielversion.
+    param([string]$StateDir,[string]$Serial,[string]$Kind,[string]$File,[string]$TargetNorm)
+    if (-not $Serial -or -not $Kind) { return }
+    $mtx = New-Object System.Threading.Mutex($false,'Global\OV_RackmountFw_StagedFlash')
+    try { [void]$mtx.WaitOne() } catch {}
+    try {
+        $list = @(Read-StagedFlashes -StateDir $StateDir | Where-Object { -not ("$($_.Serial)" -ieq $Serial -and "$($_.Kind)" -ieq $Kind) })
+        $list += [pscustomobject]@{ Serial = $Serial; Kind = $Kind; File = $File; TargetNorm = $TargetNorm; StagedAt = (Get-Date).ToString('s') }
+        $path = Get-StagedFlashPath -StateDir $StateDir
+        $dir = Split-Path -Parent $path
+        if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        (@($list) | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $path -Encoding UTF8
+    } catch {} finally { try { [void]$mtx.ReleaseMutex() } catch {}; $mtx.Dispose() }
+}
+function Clear-StagedFlash {
+    # Entfernt den Marker fuer (Serial, Kind) - z.B. nachdem die neue
+    # Version aktiv im Inventar erscheint (Reboot erfolgt).
+    param([string]$StateDir,[string]$Serial,[string]$Kind)
+    if (-not $Serial -or -not $Kind) { return }
+    $mtx = New-Object System.Threading.Mutex($false,'Global\OV_RackmountFw_StagedFlash')
+    try { [void]$mtx.WaitOne() } catch {}
+    try {
+        $before = @(Read-StagedFlashes -StateDir $StateDir)
+        $list = @($before | Where-Object { -not ("$($_.Serial)" -ieq $Serial -and "$($_.Kind)" -ieq $Kind) })
+        if ($list.Count -ne $before.Count) {
+            $path = Get-StagedFlashPath -StateDir $StateDir
+            if ($list.Count -eq 0) { Remove-Item -LiteralPath $path -ErrorAction SilentlyContinue }
+            else { (@($list) | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $path -Encoding UTF8 }
+        }
+    } catch {} finally { try { [void]$mtx.ReleaseMutex() } catch {}; $mtx.Dispose() }
 }
 '@
 
@@ -1519,11 +1635,12 @@ function Start-Batch {
 
     foreach ($entry in $Servers) {
         $argTable = @{
-            iloCode = $script:iloCode
-            ilo     = $entry.Ilo
-            user    = $entry.User
-            pass    = $entry.Pass
-            uiQueue = $script:uiQueue
+            iloCode      = $script:iloCode
+            ilo          = $entry.Ilo
+            user         = $entry.User
+            pass         = $entry.Pass
+            uiQueue      = $script:uiQueue
+            scriptFolder = $scriptFolder
         }
         if ($ExtraArgs) { foreach ($k in $ExtraArgs.Keys) { $argTable[$k] = $ExtraArgs[$k] } }
         $ps = [powershell]::Create()
@@ -1716,7 +1833,7 @@ $btnFlash.Add_Click({
     $worker = {
         param($p)
         $iloCode = $p.iloCode; $ilo = $p.ilo; $user = $p.user; $pass = $p.pass; $uiQueue = $p.uiQueue
-        $components = $p.components; $mode = $p.mode; $baseDir = $p.baseDir
+        $components = $p.components; $mode = $p.mode; $baseDir = $p.baseDir; $scriptFolder = $p.scriptFolder
         Invoke-Expression $iloCode
         # Lokaler Log-Helfer: schreibt in das gemeinsame UI-/Datei-Log.
         $log = { param($t) $uiQueue.Enqueue(@{ Type = 'LOG'; Text = "$ilo : $t" }) }.GetNewClosure()
@@ -1731,6 +1848,14 @@ $btnFlash.Add_Click({
             $info = ILO-GetSystemInfo -Ilo $ilo -Token $token
             $uiQueue.Enqueue(@{ Type = 'MODEL'; Ilo = $ilo; Model = $info.Model })
             & $log "Systeminfo: Modell='$($info.Model)', Gen=$($info.Gen), iLO-Gen=$($info.iLO), SN=$($info.Serial)"
+            # HPE Synergy Compute-Module werden zentral ueber OneView-Firmware-
+            # Baselines (SPP/Custom SPP) verwaltet. Direktes iLO-Flashen kann mit
+            # dem Baseline-Management kollidieren -> hier bewusst hart blockieren.
+            if ($info.Model -match '(?i)Synergy') {
+                & $log "BLOCKIERT: '$($info.Model)' ist ein HPE Synergy Compute-Modul - Firmware wird ueber OneView (Baseline/SPP) verwaltet. Kein direktes iLO-Update. Server uebersprungen."
+                $uiQueue.Enqueue(@{ Type = 'DONE'; Ilo = $ilo; Success = $false; Phase = 'Synergy - blockiert'; Detail = "Synergy Compute-Modul '$($info.Model)' - Firmware via OneView verwalten, direktes iLO-Flashen unterbunden" })
+                return
+            }
             if ($info.Gen -gt 0 -and $info.Gen -lt 10) {
                 & $log "Uebersprungen: Gen$($info.Gen) < Gen10 (nicht unterstuetzt)"
                 $uiQueue.Enqueue(@{ Type = 'DONE'; Ilo = $ilo; Success = $false; Phase = 'Nicht unterstuetzt'; Detail = "Gen$($info.Gen) < Gen10 - uebersprungen" })
@@ -1816,6 +1941,9 @@ $btnFlash.Add_Click({
                     if ($hit) {
                         & $log "Uebersprungen $idx/$total : '$name' - Version $tgtVer bereits vorhanden (Inventar '$($hit.Name)' = $($hit.Version))"
                         $uiQueue.Enqueue(@{ Type = 'PHASE'; Ilo = $ilo; Phase = "Aktuell $idx/$total : $name" })
+                        # Zielversion ist aktiv im Inventar -> evtl. gesetzter
+                        # Staged-Marker (Reboot erfolgt) kann entfernt werden.
+                        if (-not $kind.Deferred -and -not $kind.IsIlo) { Clear-StagedFlash -StateDir $scriptFolder -Serial $info.Serial -Kind $kind.Kind }
                         $skipNames += $name
                         continue
                     }
@@ -1824,6 +1952,52 @@ $btnFlash.Add_Click({
                 } else {
                     $whyNo = if (-not $instMatches.Count) { "kein Inventar-Eintrag fuer [$($kind.Kind)] (Muster '$($kind.InvPattern)')" } else { "keine Zielversion aus fwpkg lesbar" }
                     & $log "Versionspruefung '$name' nicht moeglich: $whyNo -> wird geflasht."
+                }
+
+                # iLO-NATIVE Erkennung fuer System ROM (BIOS): Die ComputerSystem-
+                # Ressource (Oem.Hpe.Bios) fuehrt die aktive (Current) UND die
+                # Backup/Redundant-ROM-Version. Anders als das FirmwareInventory
+                # zeigt 'Backup' unmittelbar nach einem Online-Flash bereits die
+                # frisch geflashte, noch nicht per Reboot aktivierte Version (genau
+                # wie die iLO-Overview). Damit wird ein zweiter Lauf VOR dem Reboot
+                # zuverlaessig erkannt, ohne auf einen lokalen Marker angewiesen zu
+                # sein. Stimmt die Zielversion mit Current -> bereits aktiv; mit
+                # Backup -> bereits geflasht, Aktivierung beim Reboot ausstehend.
+                if ($kind.Kind -eq 'ROM' -and $tgtVer) {
+                    $tnRom = Get-NormFwVersion $tgtVer
+                    $curN  = Get-NormFwVersion $info.BiosCurrent
+                    $bakN  = Get-NormFwVersion $info.BiosBackup
+                    if ($tnRom -and $curN -and $tnRom -eq $curN) {
+                        & $log "Uebersprungen $idx/$total : '$name' - Version $tgtVer bereits aktiv (System ROM = $($info.BiosCurrent))"
+                        $uiQueue.Enqueue(@{ Type = 'PHASE'; Ilo = $ilo; Phase = "Aktuell $idx/$total : $name" })
+                        if (-not $kind.IsIlo) { Clear-StagedFlash -StateDir $scriptFolder -Serial $info.Serial -Kind $kind.Kind }
+                        $skipNames += $name
+                        continue
+                    }
+                    if ($tnRom -and $bakN -and $tnRom -eq $bakN) {
+                        & $log "Uebersprungen $idx/$total : '$name' - Version $tgtVer bereits in Redundant System ROM geflasht (Backup = $($info.BiosBackup)), Aktivierung beim Reboot ausstehend."
+                        $uiQueue.Enqueue(@{ Type = 'PHASE'; Ilo = $ilo; Phase = "Vorgemerkt $idx/$total : $name (Reboot)" })
+                        $stagedNames += $name
+                        $rebootNeeded = $true
+                        continue
+                    }
+                }
+
+                # Fallback (lokaler Marker) fuer bereits geflashte, aber noch nicht
+                # per Reboot aktivierte, direkt geflashte Nicht-iLO-Komponenten,
+                # falls die iLO-native Backup-ROM-Erkennung oben nicht greift (z.B.
+                # aeltere iLO-Firmware ohne Oem.Hpe.Bios.Backup). iLO meldet die neue
+                # Version erst NACH dem Reboot im Inventar; der Marker verhindert
+                # erneutes Flashen bei einem zweiten Lauf VOR dem Reboot.
+                if (-not $kind.Deferred -and -not $kind.IsIlo -and $tgtVer) {
+                    $tnStg = Get-NormFwVersion $tgtVer
+                    if ($tnStg -and (Test-StagedFlash -StateDir $scriptFolder -Serial $info.Serial -Kind $kind.Kind -TargetNorm $tnStg)) {
+                        & $log "Uebersprungen $idx/$total : '$name' - Version $tgtVer wurde bereits geflasht (Redundant ROM), Aktivierung beim Reboot ausstehend."
+                        $uiQueue.Enqueue(@{ Type = 'PHASE'; Ilo = $ilo; Phase = "Vorgemerkt $idx/$total : $name (Reboot)" })
+                        $stagedNames += $name
+                        $rebootNeeded = $true
+                        continue
+                    }
                 }
 
                 try {
@@ -1841,18 +2015,33 @@ $btnFlash.Add_Click({
                     $cb = { param($pct) $uiQueue.Enqueue(@{ Type = 'PROGRESS'; Ilo = $ilo; Percent = $pct }) }.GetNewClosure()
 
                     if ($kind.Deferred) {
-                        # SPS/CPLD/IE: NUR ins iLO-Repository hochladen (UpdateTarget=false).
-                        # Sofortiges Flashen (UpdateTarget=true) wuerde 'Error' liefern.
-                        ILO-UploadComponent -Ilo $ilo -Token $token -PushUri $pushUri -FilePath $comp -UpdateRepository:$true -UpdateTarget:$false -ProgressCb $cb | Out-Null
-                        & $log "Upload $idx/$total abgeschlossen - schreibe ins iLO-Repository..."
-                        $uiQueue.Enqueue(@{ Type = 'PHASE'; Ilo = $ilo; Phase = "Repository $idx/$total : $name" })
-                        $rcb = { param($pct, $state) $uiQueue.Enqueue(@{ Type = 'PROGRESS'; Ilo = $ilo; Percent = $pct }) }.GetNewClosure()
-                        $rState = ILO-WaitForRepository -Ilo $ilo -Token $token -TimeoutSec 600 -ProgressCb $rcb
-                        & $log "Repository-Upload $idx/$total fertig: '$name' (State='$rState'). Lege Update-Task an..."
+                        # WICHTIG bei WIEDERHOLTEM Lauf: Liegt die Komponente bereits
+                        # im iLO-Repository (vom letzten, noch nicht per Reboot
+                        # aktivierten Update), wuerde ein erneuter Repository-Upload
+                        # derselben Datei den UpdateService in den Zustand 'Error'
+                        # versetzen ("liegt im Repository, aber Fehler"). Daher zuerst
+                        # pruefen und den Upload ueberspringen; der Queue-Task wird
+                        # anschliessend ohnehin (idempotent) sichergestellt.
+                        $existing = ILO-FindRepositoryComponent -Ilo $ilo -Token $token -ComponentFileName $name
+                        if ($existing) {
+                            & $log "Repository $idx/$total : '$name' liegt bereits im iLO-Repository (vom vorherigen Lauf, noch nicht aktiviert) - kein erneuter Upload."
+                            $uiQueue.Enqueue(@{ Type = 'PHASE'; Ilo = $ilo; Phase = "Repository $idx/$total : $name (vorhanden)" })
+                        } else {
+                            # SPS/CPLD/IE: NUR ins iLO-Repository hochladen (UpdateTarget=false).
+                            # Sofortiges Flashen (UpdateTarget=true) wuerde 'Error' liefern.
+                            ILO-UploadComponent -Ilo $ilo -Token $token -PushUri $pushUri -FilePath $comp -UpdateRepository:$true -UpdateTarget:$false -ProgressCb $cb | Out-Null
+                            & $log "Upload $idx/$total abgeschlossen - schreibe ins iLO-Repository..."
+                            $uiQueue.Enqueue(@{ Type = 'PHASE'; Ilo = $ilo; Phase = "Repository $idx/$total : $name" })
+                            $rcb = { param($pct, $state) $uiQueue.Enqueue(@{ Type = 'PROGRESS'; Ilo = $ilo; Percent = $pct }) }.GetNewClosure()
+                            $rState = ILO-WaitForRepository -Ilo $ilo -Token $token -TimeoutSec 600 -ProgressCb $rcb
+                            & $log "Repository-Upload $idx/$total fertig: '$name' (State='$rState')."
+                        }
 
-                        # Task in der UpdateTaskQueue anlegen -> Aktivierung beim naechsten Reboot/POST.
-                        # Die Funktion verifiziert selbst, dass der Task wirklich in der Queue liegt,
-                        # und probiert sonst weitere Payload-Varianten (LogCb blendet Details ein).
+                        # Task in der UpdateTaskQueue anlegen/sicherstellen -> Aktivierung
+                        # beim naechsten Reboot/POST. ILO-CreateUpdateTask ist idempotent:
+                        # existiert bereits ein Task fuer die Datei, wird dieser akzeptiert;
+                        # sonst wird er angelegt (mit Verifikation + Payload-Fallbacks).
+                        & $log "Stelle Update-Task in der Queue sicher fuer '$name'..."
                         $taskUri = ILO-CreateUpdateTask -Ilo $ilo -Token $token -ComponentFileName $name -UpdatableBy $kind.UpdatableBy -LogCb $log
                         & $log "Update-Task in Queue bestaetigt fuer '$name' (UpdatableBy=$(($kind.UpdatableBy) -join '+'))$(if($taskUri){" -> $taskUri"})"
                         $uiQueue.Enqueue(@{ Type = 'PHASE'; Ilo = $ilo; Phase = "Vorgemerkt $idx/$total : $name" })
@@ -1865,6 +2054,14 @@ $btnFlash.Add_Click({
                         $wf = ILO-WaitForFlash -Ilo $ilo -Token $token -User $user -Pass $pass -TimeoutSec 2400 -ProgressCb $fcb
                         $token = $wf.Token
                         & $log "Flash $idx/$total fertig: '$name' (End-State='$($wf.State)')"
+                        # Direkt geflashte Nicht-iLO-Komponente (v.a. BIOS/System ROM):
+                        # neue Version liegt in der Redundant/Backup-ROM und wird erst
+                        # beim Reboot aktiv - lokal vormerken, damit ein zweiter Lauf
+                        # VOR dem Reboot nicht erneut flasht.
+                        if (-not $kind.IsIlo -and $tgtVer) {
+                            $tnMk = Get-NormFwVersion $tgtVer
+                            if ($tnMk) { Set-StagedFlash -StateDir $scriptFolder -Serial $info.Serial -Kind $kind.Kind -File $name -TargetNorm $tnMk }
+                        }
                     }
 
                     # iLO ist nach Selbst-Reset sofort aktiv; alles andere braucht einen Reboot.

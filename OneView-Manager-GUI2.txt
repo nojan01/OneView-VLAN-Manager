@@ -4107,7 +4107,7 @@ $btnServerInfo.Add_Click({
 #  Button-Event: Rackmount Firmware (eigenständiges Tool)
 # ============================================================================
 $btnRackFirmware.Add_Click({
-    $rackFwScript = Join-Path $scriptDir "Oneview_RackmountFirmware\OneView-RackmountFirmware-GUI.ps1"
+    $rackFwScript = Join-Path $scriptDir "Oneview_FirmwareUpdateManager\OneView-RackmountFirmware-GUI.ps1"
     if (-not (Test-Path $rackFwScript)) {
         [System.Windows.Forms.MessageBox]::Show(
             "Rackmount-Firmware-Script nicht gefunden:`n$rackFwScript",
