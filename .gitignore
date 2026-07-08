@@ -12,3 +12,7 @@ Icon?
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Skript-Snapshots / nummerierte Backup-Kopien (nicht versionieren)
+OneView-Manager-GUI*.txt
+**/OneView-RackmountFirmware-GUI*.txt
