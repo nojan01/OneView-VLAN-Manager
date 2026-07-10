@@ -138,13 +138,14 @@ Funktionen:
 - **Server-Quelle ist OneView**: Das Tool liest `server-hardware` der monitored Appliances aus und übernimmt **iLO-Adresse, Modell und Scope** automatisch (Filter „nur Gen10+"). Die Serverliste ([Servers.txt](Oneview_FirmwareUpdateManager/Servers.txt)) wird dabei erzeugt und kann offline wieder geladen werden.
 - **Auswahl nach Servertyp und nach Scope**: Zwei Dropdowns filtern die angezeigten Server nach **Modell** (z. B. DL360 Gen10) und nach **OneView-Scope** (ESX, Linux, Windows, VDI …); zusätzlich Textsuche auf die iLO-Adresse.
 - **Optionale SHA-256-Verifikation** der Firmware-Datei vor dem Upload (nur Einzeldatei)
+- **Option „Nur iLO (alle Gen.)"**: Flasht ausschließlich die iLO-Firmware auf den ausgewählten Servern – **unabhängig von der Generation** (auch unterhalb Gen10). Andere Komponenten (BIOS/SPS/CPLD/…) in der Firmware-Quelle werden ignoriert; bereits aktuelle iLO-Versionen weiterhin übersprungen. HPE Synergy bleibt auch hier blockiert.
 - **Live-Fortschritt** pro Server (Upload + Flash) in einer Tabelle, konsolidiertes Log unter `Oneview_FirmwareUpdateManager/Logs/`
 
 Sicherheit:
 
 - Es wird **nicht automatisch rebootet**. BIOS/Systemfirmware wird in den Pending/Redundant-Bereich geschrieben und beim nächsten regulären Neustart (Wartungsfenster) aktiv.
 - Ist iLO-Firmware im Stapel, wird sie **zuletzt** geflasht; nach dem iLO-Reset wird die Session automatisch neu aufgebaut.
-- Server unterhalb Gen10 werden erkannt und übersprungen.
+- Server unterhalb Gen10 werden erkannt und übersprungen – **außer** die Option „Nur iLO (alle Gen.)" ist aktiv (dann wird nur die iLO-Firmware verarbeitet).
 
 ### Server-Quelle (OneView)
 

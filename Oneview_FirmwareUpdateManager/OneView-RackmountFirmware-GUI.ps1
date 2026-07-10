@@ -1476,8 +1476,18 @@ $btnFlash.FlatStyle = 'Flat'; $btnFlash.Font = $boldFont
 $btnFlash.TextAlign = 'MiddleCenter'; $btnFlash.AutoEllipsis = $false; $btnFlash.Padding = '0,0,0,0'
 $form.Controls.Add($btnFlash)
 
+# Option: nur die iLO-Firmware flashen - unabhaengig von der Server-Generation.
+# Damit lassen sich gezielt iLO-Updates auf beliebige (auch aeltere) Server
+# ausrollen, ohne BIOS/SPS/etc. anzufassen. Synergy bleibt weiterhin blockiert.
+$chkIloOnly = New-Object System.Windows.Forms.CheckBox
+$chkIloOnly.Location = '528,420'; $chkIloOnly.Size = '172,20'; $chkIloOnly.Text = "Nur iLO (alle Gen.)"
+$form.Controls.Add($chkIloOnly)
+$tipIlo = New-Object System.Windows.Forms.ToolTip
+$tipIlo.AutoPopDelay = 15000
+$tipIlo.SetToolTip($chkIloOnly, "Aktualisiert AUSSCHLIESSLICH die iLO-Firmware auf den ausgewaehlten Servern - unabhaengig von der Generation (auch < Gen10).`r`nAndere Komponenten (BIOS/SPS/CPLD/...) im Quellordner werden ignoriert.`r`nBereits aktuelle iLO-Versionen werden weiterhin uebersprungen. HPE Synergy bleibt blockiert.")
+
 $progress = New-Object System.Windows.Forms.ProgressBar
-$progress.Location = '540,418'; $progress.Size = '575,26'; $progress.Minimum = 0; $progress.Maximum = 100
+$progress.Location = '705,418'; $progress.Size = '410,26'; $progress.Minimum = 0; $progress.Maximum = 100
 $form.Controls.Add($progress)
 
 # ─────────────────────────────────────────
@@ -1801,9 +1811,12 @@ $btnFlash.Add_Click({
         Add-Log "SHA-256 OK ($localHash)" ([System.Drawing.Color]::DarkGreen)
     }
 
+    $iloOnlyMsg = if ($chkIloOnly.Checked) { "NUR-iLO-Modus: Es wird ausschliesslich die iLO-Firmware geflasht (alle Generationen, auch < Gen10).`nAndere Komponenten werden ignoriert. HPE Synergy bleibt blockiert.`n`n" } else { "" }
+
     if ($mode -eq 'basedir') {
         $res = [System.Windows.Forms.MessageBox]::Show(
             "ACHTUNG - Firmware wird auf $($servers.Count) Server geflasht (max. $([int]$numPar.Value) parallel).`n`n" +
+            $iloOnlyMsg +
             "Automatische Typ-Zuordnung aus Basisverzeichnis:`n$fwPath`n`n" +
             "Je Server wird das Modell live am iLO ermittelt und der passende Typ-Unterordner (.fwpkg) verwendet.`n" +
             "Server ohne passenden Unterordner werden uebersprungen.`n" +
@@ -1819,6 +1832,7 @@ $btnFlash.Add_Click({
         $compNames = ($components | ForEach-Object { [System.IO.Path]::GetFileName($_) }) -join ", "
         $res = [System.Windows.Forms.MessageBox]::Show(
             "ACHTUNG - Firmware wird auf $($servers.Count) Server geflasht (max. $([int]$numPar.Value) parallel).`n`n" +
+            $iloOnlyMsg +
             "Komponenten ($($components.Count)):`n$compNames`n`n" +
             "Bereits aktuelle Komponenten werden automatisch uebersprungen.`n" +
             "Es wird NICHT automatisch rebootet.`n" +
@@ -1834,6 +1848,7 @@ $btnFlash.Add_Click({
         param($p)
         $iloCode = $p.iloCode; $ilo = $p.ilo; $user = $p.user; $pass = $p.pass; $uiQueue = $p.uiQueue
         $components = $p.components; $mode = $p.mode; $baseDir = $p.baseDir; $scriptFolder = $p.scriptFolder
+        $iloOnly = [bool]$p.iloOnly
         Invoke-Expression $iloCode
         # Lokaler Log-Helfer: schreibt in das gemeinsame UI-/Datei-Log.
         $log = { param($t) $uiQueue.Enqueue(@{ Type = 'LOG'; Text = "$ilo : $t" }) }.GetNewClosure()
@@ -1857,9 +1872,13 @@ $btnFlash.Add_Click({
                 return
             }
             if ($info.Gen -gt 0 -and $info.Gen -lt 10) {
-                & $log "Uebersprungen: Gen$($info.Gen) < Gen10 (nicht unterstuetzt)"
-                $uiQueue.Enqueue(@{ Type = 'DONE'; Ilo = $ilo; Success = $false; Phase = 'Nicht unterstuetzt'; Detail = "Gen$($info.Gen) < Gen10 - uebersprungen" })
-                return
+                if ($iloOnly) {
+                    & $log "Gen$($info.Gen) < Gen10: Nur-iLO-Modus aktiv -> es wird ausschliesslich iLO-Firmware verarbeitet."
+                } else {
+                    & $log "Uebersprungen: Gen$($info.Gen) < Gen10 (nicht unterstuetzt)"
+                    $uiQueue.Enqueue(@{ Type = 'DONE'; Ilo = $ilo; Success = $false; Phase = 'Nicht unterstuetzt'; Detail = "Gen$($info.Gen) < Gen10 - uebersprungen" })
+                    return
+                }
             }
 
             # Basisverzeichnis-Modus: passenden Typ-Unterordner je Server ermitteln
@@ -1881,6 +1900,20 @@ $btnFlash.Add_Click({
                 # iLO-eigene Firmware ans Ende sortieren (Reset erst am Schluss)
                 $components = @($components | Sort-Object @{ Expression = { [System.IO.Path]::GetFileName($_) -match '(?i)ilo' }; Ascending = $true }, @{ Expression = { $_ } })
                 & $log "Typ-Ordner '$([System.IO.Path]::GetFileName($folder))', $($components.Count) Komponente(n): $((@($components | ForEach-Object { [System.IO.Path]::GetFileName($_) })) -join ', ')"
+            }
+
+            # Nur-iLO-Modus: Komponentenliste auf iLO-Firmware reduzieren. Greift
+            # fuer alle Quell-Modi (Einzeldatei/Ordner/Basisverzeichnis), da hier
+            # bereits die effektive Dateiliste des Servers feststeht.
+            if ($iloOnly) {
+                $preCount = @($components).Count
+                $components = @($components | Where-Object { (Get-ComponentKind -FileName ([System.IO.Path]::GetFileName($_))).Kind -eq 'iLO' })
+                $iloTxt = if ($components.Count) { (@($components | ForEach-Object { [System.IO.Path]::GetFileName($_) })) -join ', ' } else { '(keine)' }
+                & $log "Nur-iLO-Modus: $($components.Count) von $preCount Komponente(n) sind iLO-Firmware: $iloTxt"
+                if ($components.Count -eq 0) {
+                    $uiQueue.Enqueue(@{ Type = 'DONE'; Ilo = $ilo; Success = $false; Phase = 'Keine iLO-Firmware'; Detail = "Nur-iLO-Modus: keine iLO-.fwpkg in der Firmware-Quelle gefunden (Dateiname muss 'ilo' enthalten)" })
+                    return
+                }
             }
 
             $total = $components.Count
@@ -2121,7 +2154,7 @@ $btnFlash.Add_Click({
         }
     }
 
-    Start-Batch -Servers $servers -Worker $worker -ExtraArgs @{ components = $components; mode = $mode; baseDir = $fwPath } -MaxParallel ([int]$numPar.Value)
+    Start-Batch -Servers $servers -Worker $worker -ExtraArgs @{ components = $components; mode = $mode; baseDir = $fwPath; iloOnly = $chkIloOnly.Checked } -MaxParallel ([int]$numPar.Value)
 })
 
 # ─────────────────────────────────────────
