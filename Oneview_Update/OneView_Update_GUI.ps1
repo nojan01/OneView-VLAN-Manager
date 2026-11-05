@@ -366,6 +366,10 @@ function New-WorkerScript {
     $workerLines += '    public static extern IntPtr GetStdHandle(int nStdHandle);'
     $workerLines += '    [DllImport("kernel32.dll", CharSet=CharSet.Unicode)]'
     $workerLines += '    public static extern bool SetCurrentConsoleFontEx(IntPtr hConsoleOutput, bool bMaximumWindow, ref W_CONSOLE_FONT_INFOEX lpConsoleCurrentFontEx);'
+    $workerLines += '    [DllImport("kernel32.dll", CharSet=CharSet.Unicode)]'
+    $workerLines += '    public static extern bool GetCurrentConsoleFontEx(IntPtr hConsoleOutput, bool bMaximumWindow, ref W_CONSOLE_FONT_INFOEX lpConsoleCurrentFontEx);'
+    $workerLines += '    [DllImport("user32.dll")]'
+    $workerLines += '    public static extern int GetSystemMetrics(int nIndex);'
     $workerLines += '    [DllImport("kernel32.dll", SetLastError=true)]'
     $workerLines += '    public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);'
     $workerLines += '    [DllImport("kernel32.dll", SetLastError=true)]'
@@ -483,50 +487,91 @@ function New-WorkerScript {
     $workerLines += '    [WorkerNative]::SetConsoleMode($hIn, $mode) | Out-Null'
     $workerLines += '}'
     $workerLines += ""
-    $workerLines += "# Console-Font setzen"
-    $workerLines += '$fi = New-Object W_CONSOLE_FONT_INFOEX'
-    $workerLines += '$fi.cbSize = [uint32]84'
-    $workerLines += '$fi.nFont = [uint32]0'
-    $workerLines += '$c = New-Object W_COORD'
-    $workerLines += '$c.X = [short]0'
-    $workerLines += '$c.Y = [short]14'
-    $workerLines += '$fi.dwFontSize = $c'
-    $workerLines += '$fi.FontFamily = 54'
-    $workerLines += '$fi.FontWeight = 400'
-    $workerLines += '$fi.FaceName = "Consolas"'
-    $workerLines += '$hOut = [WorkerNative]::GetStdHandle([WorkerNative]::STD_OUTPUT_HANDLE)'
-    $workerLines += 'if ($hOut -ne [IntPtr]::Zero -and $hOut -ne ([IntPtr]::new(-1))) {'
-    $workerLines += '    [WorkerNative]::SetCurrentConsoleFontEx($hOut, $false, [ref]$fi) | Out-Null'
+    $workerLines += "# Console-Layout: Font setzen und Puffer-/Fenstergroesse (Spalten x Zeilen) an die Pixelgroesse des Host-Panels anpassen."
+    $workerLines += "# Ohne diese Anpassung behaelt conhost die Start-Pufferbreite, Text bricht an der falschen Stelle um und Write-Progress-Balken verrutschen."
+    $workerLines += 'function global:Set-WorkerConsoleLayout {'
+    $workerLines += '    param([int]$FontHeight, [int]$PixelWidth = 0, [int]$PixelHeight = 0)'
+    $workerLines += '    try {'
+    $workerLines += '        $hOut = [WorkerNative]::GetStdHandle([WorkerNative]::STD_OUTPUT_HANDLE)'
+    $workerLines += '        if ($hOut -eq [IntPtr]::Zero -or $hOut -eq ([IntPtr]::new(-1))) { return }'
+    $workerLines += '        if ($FontHeight -lt 8) { $FontHeight = 8 }'
+    $workerLines += '        if ($FontHeight -gt 22) { $FontHeight = 22 }'
+    $workerLines += '        $fi = New-Object W_CONSOLE_FONT_INFOEX'
+    $workerLines += '        $fi.cbSize = [uint32]84'
+    $workerLines += '        $fi.nFont = [uint32]0'
+    $workerLines += '        $c = New-Object W_COORD'
+    $workerLines += '        $c.X = [short]0'
+    $workerLines += '        $c.Y = [short]$FontHeight'
+    $workerLines += '        $fi.dwFontSize = $c'
+    $workerLines += '        $fi.FontFamily = 54'
+    $workerLines += '        $fi.FontWeight = 400'
+    $workerLines += '        $fi.FaceName = "Consolas"'
+    $workerLines += '        [WorkerNative]::SetCurrentConsoleFontEx($hOut, $false, [ref]$fi) | Out-Null'
+    $workerLines += '        if ($PixelWidth -le 0 -or $PixelHeight -le 0) { return }'
+    $workerLines += ''
+    $workerLines += '        # Tatsaechliche Zellgroesse der Schrift ermitteln'
+    $workerLines += '        $cur = New-Object W_CONSOLE_FONT_INFOEX'
+    $workerLines += '        $cur.cbSize = [uint32]84'
+    $workerLines += '        $cellW = 0; $cellH = 0'
+    $workerLines += '        if ([WorkerNative]::GetCurrentConsoleFontEx($hOut, $false, [ref]$cur)) {'
+    $workerLines += '            $cellW = [int]$cur.dwFontSize.X; $cellH = [int]$cur.dwFontSize.Y'
+    $workerLines += '        }'
+    $workerLines += '        if ($cellH -le 0) { $cellH = $FontHeight }'
+    $workerLines += '        if ($cellW -le 0) { $cellW = [math]::Max(1, [int][math]::Round($cellH * 0.55)) }'
+    $workerLines += '        $scrollW = [WorkerNative]::GetSystemMetrics(2)'
+    $workerLines += '        if ($scrollW -le 0) { $scrollW = 17 }'
+    $workerLines += ''
+    $workerLines += '        $cols = [int][math]::Floor(($PixelWidth - $scrollW) / $cellW)'
+    $workerLines += '        $rows = [int][math]::Floor($PixelHeight / $cellH)'
+    $workerLines += '        $raw = $host.UI.RawUI'
+    $workerLines += '        $maxPhys = $raw.MaxPhysicalWindowSize'
+    $workerLines += '        $cols = [math]::Max(40, [math]::Min($cols, [int]$maxPhys.Width))'
+    $workerLines += '        $rows = [math]::Max(5, [math]::Min($rows, [int]$maxPhys.Height))'
+    $workerLines += '        $bufRows = [math]::Max(3000, $rows)'
+    $workerLines += ''
+    $workerLines += '        $win = $raw.WindowSize'
+    $workerLines += '        $buf = $raw.BufferSize'
+    $workerLines += '        if ($win.Width -eq $cols -and $win.Height -eq $rows -and $buf.Width -eq $cols) { return }'
+    $workerLines += '        # Fenster darf nie groesser als der Puffer sein: erst verkleinern, dann Puffer setzen, dann Zielgroesse'
+    $workerLines += '        $tmpW = [math]::Min([int]$win.Width, $cols)'
+    $workerLines += '        $tmpH = [math]::Min([int]$win.Height, $rows)'
+    $workerLines += '        $raw.WindowSize = New-Object System.Management.Automation.Host.Size($tmpW, $tmpH)'
+    $workerLines += '        $raw.BufferSize = New-Object System.Management.Automation.Host.Size($cols, $bufRows)'
+    $workerLines += '        $raw.WindowSize = New-Object System.Management.Automation.Host.Size($cols, $rows)'
+    $workerLines += '        $pos = $raw.WindowPosition'
+    $workerLines += '        if ($pos.X -ne 0) { $pos.X = 0; $raw.WindowPosition = $pos }'
+    $workerLines += '    } catch { }'
     $workerLines += '}'
+    $workerLines += 'Set-WorkerConsoleLayout -FontHeight 14'
     $workerLines += ""
-    $workerLines += "# FileSystemWatcher fuer dynamische Schriftgroesse (GUI schreibt gewuenschte Groesse)"
+    $workerLines += "# FileSystemWatcher fuer dynamisches Layout (GUI schreibt 'Schrifthoehe;PixelBreite;PixelHoehe')"
+    $workerLines += "`$layoutFile = Join-Path `$logDir '${WorkerName}_Layout.txt'"
+    $workerLines += 'function global:Read-WorkerLayoutFile {'
+    $workerLines += '    param([string]$Path)'
+    $workerLines += '    try {'
+    $workerLines += '        if (-not (Test-Path $Path)) { return }'
+    $workerLines += '        $parts = ((Get-Content $Path -Raw).Trim() -split ";")'
+    $workerLines += '        $fh = [int]$parts[0]'
+    $workerLines += '        $pw = 0; $ph = 0'
+    $workerLines += '        if ($parts.Count -ge 3) { $pw = [int]$parts[1]; $ph = [int]$parts[2] }'
+    $workerLines += '        Set-WorkerConsoleLayout -FontHeight $fh -PixelWidth $pw -PixelHeight $ph'
+    $workerLines += '    } catch { }'
+    $workerLines += '}'
     $workerLines += "`$fontWatcher = New-Object System.IO.FileSystemWatcher"
     $workerLines += "`$fontWatcher.Path = `$logDir"
-    $workerLines += "`$fontWatcher.Filter = '${WorkerName}_FontSize.txt'"
-    $workerLines += "`$fontWatcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite"
-    $workerLines += 'Register-ObjectEvent -InputObject $fontWatcher -EventName Changed -Action {'
+    $workerLines += "`$fontWatcher.Filter = '${WorkerName}_Layout.txt'"
+    $workerLines += "`$fontWatcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite -bor [System.IO.NotifyFilters]::FileName"
+    $workerLines += '$layoutAction = {'
     $workerLines += '    try {'
-    $workerLines += '        Start-Sleep -Milliseconds 50'
-    $workerLines += '        $fontSize = [int](Get-Content $Event.SourceEventArgs.FullPath -Raw).Trim()'
-    $workerLines += '        if ($fontSize -ge 8 -and $fontSize -le 22) {'
-    $workerLines += '            $fi2 = New-Object W_CONSOLE_FONT_INFOEX'
-    $workerLines += '            $fi2.cbSize = [uint32]84'
-    $workerLines += '            $fi2.nFont = [uint32]0'
-    $workerLines += '            $c2 = New-Object W_COORD'
-    $workerLines += '            $c2.X = [short]0'
-    $workerLines += '            $c2.Y = [short]$fontSize'
-    $workerLines += '            $fi2.dwFontSize = $c2'
-    $workerLines += '            $fi2.FontFamily = 54'
-    $workerLines += '            $fi2.FontWeight = 400'
-    $workerLines += '            $fi2.FaceName = "Consolas"'
-    $workerLines += '            $hOut2 = [WorkerNative]::GetStdHandle([WorkerNative]::STD_OUTPUT_HANDLE)'
-    $workerLines += '            if ($hOut2 -ne [IntPtr]::Zero -and $hOut2 -ne ([IntPtr]::new(-1))) {'
-    $workerLines += '                [WorkerNative]::SetCurrentConsoleFontEx($hOut2, $false, [ref]$fi2) | Out-Null'
-    $workerLines += '            }'
-    $workerLines += '        }'
+    $workerLines += '        Start-Sleep -Milliseconds 80'
+    $workerLines += '        Read-WorkerLayoutFile -Path $Event.SourceEventArgs.FullPath'
     $workerLines += '    } catch { }'
-    $workerLines += '} | Out-Null'
+    $workerLines += '}'
+    $workerLines += 'Register-ObjectEvent -InputObject $fontWatcher -EventName Changed -Action $layoutAction | Out-Null'
+    $workerLines += 'Register-ObjectEvent -InputObject $fontWatcher -EventName Created -Action $layoutAction | Out-Null'
     $workerLines += '$fontWatcher.EnableRaisingEvents = $true'
+    $workerLines += '# Falls die GUI das Layout bereits geschrieben hat, sofort anwenden'
+    $workerLines += 'Read-WorkerLayoutFile -Path $layoutFile'
     $workerLines += ""
     $workerLines += 'Write-Host "' + $WorkerName + ' startet Updates fuer folgende Appliances" -ForegroundColor Cyan'
     $workerLines += '$ApplianceIPs | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }'
@@ -1662,13 +1707,14 @@ function Show-UnifiedGUI {
                         $global:guiWorkerEmbedded[$i] = $true
                         $global:guiWorkerHandles[$i] = $hWnd
                         
-                        # Initiale Schriftgrösse an Panel-Höhe anpassen
+                        # Initiales Layout (Schrifthoehe;PixelBreite;PixelHoehe) an den Worker melden
                         $desiredH = [math]::Max(8, [math]::Min(22, [int][math]::Floor($hostPanel.ClientSize.Height / 25)))
                         $wn2 = $global:guiWorkerNames[$i]
                         if ($wn2) {
-                            $fontPath = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "${wn2}_FontSize.txt"
-                            $desiredH | Out-File -FilePath $fontPath -Force
+                            $layoutPath = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "${wn2}_Layout.txt"
+                            "$desiredH;$($hostPanel.ClientSize.Width);$($hostPanel.ClientSize.Height)" | Out-File -FilePath $layoutPath -Force
                             $global:guiLastFontHeight[$i] = $desiredH
+                            $global:guiLastPanelSize[$i] = @{ Width = $hostPanel.ClientSize.Width; Height = $hostPanel.ClientSize.Height }
                         }
                         
                         # Resize-Handler für das Host-Panel registrieren
@@ -1705,15 +1751,13 @@ function Show-UnifiedGUI {
                                 [NativeMethods]::MoveWindow($hWnd, 0, 0, $curW, $curH, $true) | Out-Null
                                 $global:guiLastPanelSize[$i] = @{ Width = $curW; Height = $curH }
                                 
-                                # Schriftgrösse dynamisch an Panel-Höhe anpassen
+                                # Layout an den Worker melden: Schriftgroesse an Panel-Hoehe, Puffer/Fenster an Pixelgroesse
                                 $desiredH = [math]::Max(8, [math]::Min(22, [int][math]::Floor($curH / 25)))
-                                if ($desiredH -ne $global:guiLastFontHeight[$i]) {
-                                    $wn = $global:guiWorkerNames[$i]
-                                    if ($wn) {
-                                        $fontPath = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "${wn}_FontSize.txt"
-                                        $desiredH | Out-File -FilePath $fontPath -Force
-                                        $global:guiLastFontHeight[$i] = $desiredH
-                                    }
+                                $wn = $global:guiWorkerNames[$i]
+                                if ($wn) {
+                                    $layoutPath = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "${wn}_Layout.txt"
+                                    "$desiredH;$curW;$curH" | Out-File -FilePath $layoutPath -Force
+                                    $global:guiLastFontHeight[$i] = $desiredH
                                 }
                             }
                         }
@@ -1860,7 +1904,7 @@ function Show-UnifiedGUI {
             if ($global:guiWorkerNames[$i]) {
                 $oldMarker = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "$($global:guiWorkerNames[$i])_Complete.txt"
                 $oldHandle = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "$($global:guiWorkerNames[$i])_Handle.txt"
-                $oldFont = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "$($global:guiWorkerNames[$i])_FontSize.txt"
+                $oldFont = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "$($global:guiWorkerNames[$i])_Layout.txt"
                 Remove-Item $oldMarker -Force -ErrorAction SilentlyContinue
                 Remove-Item $oldHandle -Force -ErrorAction SilentlyContinue
                 Remove-Item $oldFont -Force -ErrorAction SilentlyContinue
@@ -2044,7 +2088,7 @@ function Show-UnifiedGUI {
                     $scriptPath = Join-Path $global:scriptFolder "${wn}_Update.ps1"
                     $markerPath = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "${wn}_Complete.txt"
                     $handlePath = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "${wn}_Handle.txt"
-                    $fontPath = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "${wn}_FontSize.txt"
+                    $fontPath = Join-Path (Join-Path $global:scriptFolder "OneView_Update") "${wn}_Layout.txt"
                     Remove-Item $scriptPath -Force -ErrorAction SilentlyContinue
                     Remove-Item $markerPath -Force -ErrorAction SilentlyContinue
                     Remove-Item $handlePath -Force -ErrorAction SilentlyContinue
