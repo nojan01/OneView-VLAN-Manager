@@ -219,6 +219,17 @@ $btnHelp.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $btnHelp.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
 $tblTools.Controls.Add($btnHelp, 3, 1)
 
+# Button: Synergy Firmware (Reihe 2, Spalte 4)
+$btnSynergyFirmware = New-Object System.Windows.Forms.Button
+$btnSynergyFirmware.Text = "Synergy Firmware"
+$btnSynergyFirmware.Dock = [System.Windows.Forms.DockStyle]::Fill
+$btnSynergyFirmware.Margin = New-Object System.Windows.Forms.Padding(3, 3, 0, 0)
+$btnSynergyFirmware.BackColor = [System.Drawing.Color]::FromArgb(90, 65, 145)
+$btnSynergyFirmware.ForeColor = [System.Drawing.Color]::White
+$btnSynergyFirmware.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$btnSynergyFirmware.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$tblTools.Controls.Add($btnSynergyFirmware, 4, 1)
+
 # ============================================================================
 #  GroupBox: Anmeldeinformationen
 # ============================================================================
@@ -4119,6 +4130,51 @@ $btnRackFirmware.Add_Click({
     }
     Write-GUILog "Starte Rackmount Firmware Update Tool…" -Color ([System.Drawing.Color]::Orange)
     Start-Process pwsh -ArgumentList "-NoProfile -File `"$rackFwScript`""
+})
+
+# ============================================================================
+#  Button-Event: Synergy Firmware (eigenständiges Tool)
+# ============================================================================
+$btnSynergyFirmware.Add_Click({
+    $synergyFwScript = Join-Path $scriptDir "Oneview_FirmwareUpdateManager\OneView-SynergyFirmware-GUI.ps1"
+    $firmwareCore = Join-Path (Split-Path -Parent $synergyFwScript) "OneView-RackmountFirmware-GUI.ps1"
+    foreach ($requiredScript in @($synergyFwScript, $firmwareCore)) {
+        if (-not (Test-Path -LiteralPath $requiredScript -PathType Leaf)) {
+            [System.Windows.Forms.MessageBox]::Show(
+                "Synergy-Firmware-Script nicht gefunden:`n$requiredScript",
+                "Datei fehlt",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning
+            ) | Out-Null
+            return
+        }
+    }
+    if ($PSVersionTable.PSVersion -lt [version]'7.5') {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Synergy Firmware benötigt PowerShell 7.5 oder neuer.`nBitte den OneView Manager mit dieser Version starten.",
+            "PowerShell-Version",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning
+        ) | Out-Null
+        return
+    }
+    try {
+        # Dieselbe PowerShell-Version wie der Manager; STA für Windows Forms.
+        Start-Process -FilePath (Join-Path $PSHOME 'pwsh.exe') `
+            -ArgumentList "-NoProfile -STA -File `"$synergyFwScript`"" `
+            -WorkingDirectory (Split-Path -Parent $synergyFwScript) -ErrorAction Stop
+        Write-GUILog "Synergy Firmware Update Tool gestartet." -Color ([System.Drawing.Color]::Orange)
+    }
+    catch {
+        $message = "Synergy Firmware konnte nicht gestartet werden:`n$($_.Exception.Message)"
+        Write-GUILog $message -Color ([System.Drawing.Color]::Red)
+        [System.Windows.Forms.MessageBox]::Show(
+            $message,
+            "Start fehlgeschlagen",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        ) | Out-Null
+    }
 })
 
 # ============================================================================

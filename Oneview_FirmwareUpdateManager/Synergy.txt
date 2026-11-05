@@ -1,0 +1,1 @@
+# Eine Synergy-OneView-Appliance pro Zeile: Hostname/IP oder Hostname/IP;Anzeigename

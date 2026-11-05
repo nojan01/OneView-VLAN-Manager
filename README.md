@@ -2,7 +2,7 @@
 
 Grafische Oberfläche (WinForms GUI) zur Verwaltung von **Ethernet Networks**, **Network Sets**, **Server Profiles** und **Server Profile Templates** in HPE OneView. Unterstützt mehrere Appliances gleichzeitig und verwendet ausschliesslich die **HPE OneView RESTful API** (ohne das HPE OneView PowerShell-Modul).
 
-Darüber hinaus enthält das Projekt mehrere **eigenständige Tools** rund um den Betrieb von HPE OneView/Synergy: Appliance-Update, Config-Backup, User-Verwaltung, Alerts und ein Synergy-eFuse-Tool.
+Darüber hinaus enthält das Projekt mehrere **eigenständige Tools** rund um den Betrieb von HPE OneView/Synergy: Appliance-Update, Config-Backup, User-Verwaltung, Alerts, Rackmount-/Synergy-Firmwareupdates und ein Synergy-eFuse-Tool.
 
 ## Features
 
@@ -17,6 +17,8 @@ Die Haupt-GUI `OneView-Manager-GUI.ps1` enthält oben einen Bereich **„Eigenst
 | **User Manager** | `Oneview_UserManager/OneView-UserManager-GUI.ps1` | Benutzerverwaltung über mehrere Appliances (OV 6.60 und 11.10) |
 | **Alerts** | `Oneview_Alerts/Oneview_Alerts_GUI.ps1` | Alert-Auswertung (manuell + geplant) |
 | **Synergy eFuse** | `Synergy_eFuse/eFuse_GUI.ps1` | eFuse für Synergy-Komponenten (Device/ICM/Appliance/FLM) |
+| **Rackmount Firmware** | `Oneview_FirmwareUpdateManager/OneView-RackmountFirmware-GUI.ps1` | Firmwareupdate für Rackmount-Systeme ab Gen10 über iLO Redfish |
+| **Synergy Firmware** | `Oneview_FirmwareUpdateManager/OneView-SynergyFirmware-GUI.ps1` | Firmwareupdate für Synergy Compute Modules aus `Firmware\synergy` |
 
 ### GUI (OneView-Manager-GUI.ps1)
 
@@ -130,22 +132,54 @@ Hintergrund: Die Server sind in OneView nur im **Monitoring-Mode** eingebunden. 
 Funktionen:
 
 - **Inventar prüfen** (read-only): Erreichbarkeit, Modell/Generation und aktuelle iLO-/BIOS-/Komponenten-Versionen pro Server
+- **Optionaler HTML-Inventarbericht**: Verwendet ohne weitere iLO-Abfragen die
+  Ergebnisse der Inventarprüfung und enthält Servername, IP-Adresse, Modell,
+  Seriennummer, alle Firmwarestände sowie die ermittelten Updates mit aktuellem
+  und geplantem Zielstand. Der zusammengefasste Bericht ist für große Flotten
+  ausgelegt, filterbar und pro Server aufklappbar; er wird unter
+  `Oneview_FirmwareUpdateManager/Reports/` gespeichert.
+- **Optionale technische Diagnoseexporte**: Die detaillierten JSON-Dateien für
+  Paket- und Hardwareanalyse sind standardmäßig deaktiviert. Sie können über
+  **„Technische Diagnoseexporte erstellen“** für eine gezielte Fehlersuche
+  eingeschaltet werden; nur dann erfolgen die zusätzlichen read-only Device-
+  und Storage-Inventarabfragen.
 - **Firmware aktualisieren** in drei Modi:
   - **Einzeldatei** (`.fwpkg`)
   - **Ordner** mit mehreren `.fwpkg` (werden pro Server nacheinander geflasht)
   - **Basisverzeichnis mit Typ-Unterordnern** – je Server wird das Modell **live am iLO** ermittelt und automatisch der passende Typ-Ordner zugeordnet (siehe unten). Ideal für gemischte Chargen.
   - … auf einem Einzelserver **oder einer ganzen Charge parallel** (einstellbare Parallelität, Standard 8)
-- **Server-Quelle ist OneView**: Das Tool liest `server-hardware` der monitored Appliances aus und übernimmt **iLO-Adresse, Modell und Scope** automatisch (Filter „nur Gen10+"). Die Serverliste ([Servers.txt](Oneview_FirmwareUpdateManager/Servers.txt)) wird dabei erzeugt und kann offline wieder geladen werden.
+- **Server-Quelle ist OneView**: Das Tool liest `server-hardware` der monitored Appliances aus und übernimmt **iLO-Adresse, Modell und Scope** automatisch. Die Serverliste ([Servers.txt](Oneview_FirmwareUpdateManager/Servers.txt)) wird dabei erzeugt und kann offline wieder geladen werden.
 - **Auswahl nach Servertyp und nach Scope**: Zwei Dropdowns filtern die angezeigten Server nach **Modell** (z. B. DL360 Gen10) und nach **OneView-Scope** (ESX, Linux, Windows, VDI …); zusätzlich Textsuche auf die iLO-Adresse.
+- **Direkter iLO-Link**: Jede Zeile der Serverliste enthält hinter dem Scope
+  einen Link, der die HTTPS-Weboberfläche des zugehörigen iLO im Standardbrowser
+  öffnet.
 - **Optionale SHA-256-Verifikation** der Firmware-Datei vor dem Upload (nur Einzeldatei)
-- **Option „Nur iLO (alle Gen.)"**: Flasht ausschließlich die iLO-Firmware auf den ausgewählten Servern – **unabhängig von der Generation** (auch unterhalb Gen10). Andere Komponenten (BIOS/SPS/CPLD/…) in der Firmware-Quelle werden ignoriert; bereits aktuelle iLO-Versionen weiterhin übersprungen. HPE Synergy bleibt auch hier blockiert.
-- **Live-Fortschritt** pro Server (Upload + Flash) in einer Tabelle, konsolidiertes Log unter `Oneview_FirmwareUpdateManager/Logs/`
+- **Komponentenfilter (Dropdown)**: Steuert, welche Firmware-Typen aus der Quelle verarbeitet werden:
+  - **Alle Komponenten** (Standard): alle `.fwpkg` der Quelle, nur Gen10+.
+  - **Nur iLO**: Flasht ausschließlich die iLO-Firmware auf unterstützten Servern ab Gen10. Andere Komponenten (BIOS/SPS/CPLD/…) werden ignoriert.
+  - **Nur iLO + BIOS + SPS**: Verarbeitet ausschließlich iLO-, System-ROM/BIOS- und SPS/ME-Pakete (nur Gen10+); CPLD/IE/PMC/… werden ignoriert.
+  - In allen Modi: bereits aktuelle Versionen werden übersprungen, HPE Synergy bleibt blockiert.
+- **Live-Fortschritt** pro Server (Upload + Flash) in einer Tabelle; jeder
+  sichtbare Logeintrag trägt einen Zeitstempel, das konsolidierte Log liegt unter
+  `Oneview_FirmwareUpdateManager/Logs/`.
 
 Sicherheit:
 
 - Es wird **nicht automatisch rebootet**. BIOS/Systemfirmware wird in den Pending/Redundant-Bereich geschrieben und beim nächsten regulären Neustart (Wartungsfenster) aktiv.
+- Gerätespezifische Pakete einschließlich SPS, CPLD, IE und PMC werden bereits **vor jedem Upload** ausschließlich über Paket-JSON `Target`/`Targets` gegen `FirmwareInventory.Oem.Hpe.Targets` zugeordnet. `DeviceInstance` und Namensähnlichkeiten gelten nicht als Freigabe.
+- Vor der Task-Erstellung werden Paket- und Repository-`Targets` weiterhin exakt gegen `FirmwareInventory.Oem.Hpe.Targets` geprüft. Der `ApplyUpdate`-Task selbst enthält gemäß HPE UpdateService-Dokumentation keine einzelne FirmwareInventory-URI: HPE-Komponenten aktualisieren alle für ihre intern signierten Targets anwendbaren Geräte.
+- Die in der signierten Paket-Payload angegebenen Update-Agenten werden unverändert ausgewertet; das Tool erfindet oder entfernt keine Agenten.
+- `DirectFlashOK=true` in der signierten Payload erlaubt grundsätzlich einen direkten PLDM-Flash, übergeht aber niemals das Live-Signal `FirmwareInventory.Updateable=false`. Meldet iLO das konkrete Ziel als nicht direkt updatefähig, wird das Paket gesperrt; der JSON-Flashweg wird nicht in eine Queue-Route umgedeutet.
+- Der direkte HPE-`HttpPushUri`-Upload enthält ausschließlich die dokumentierten Uploadparameter. `TPMOverride` wird dort nicht mitgesendet; fordert iLO es für einen Repository-Task ausdrücklich an, erfolgt genau ein verifizierter Queue-POST mit diesem Zusatzfeld.
+- Meldet die Paket-JSON ausdrücklich `ServerPowerOff=true`, wird die Komponente nach erfolgreichem Flash als **„Power Off erforderlich“** ausgewiesen. Nur dann verlangt das Tool ein vollständiges Ausschalten statt eines normalen Reboots; bei `false` oder fehlender Angabe ändert sich das bisherige Reboot-Verhalten nicht.
+- Liegt das exakt passende Paket bereits im iLO-Repository, die aktive Geräteversion ist älter und es existiert kein Task, wird **nicht erneut hochgeladen**: Das vorhandene, gegen das Live-Inventar verifizierte Paket wird direkt in die Queue gestellt.
+- Vor jedem Repository-/Queue-Update korreliert das Tool zusätzlich den serverseitigen HPE-Zustand aus **ComponentRepository**, **UpdateTaskQueue** und aktivem **FirmwareInventory**. `Targets`, `DeviceClass`, Paketversion und `Activates` müssen zusammenpassen.
+- Bereits `Pending`, `InProgress` oder `Complete` gemeldete Komponenten werden nicht erneut hochgeladen oder als neuer Task angelegt. `Complete` plus `Activates=AfterReboot` und abweichende aktive Version gilt als **bereits durchgeführt, Aktivierung nach Reboot ausstehend**.
+- Bei `Exception`/`Expired`, unvollständig lesbarer Queue bzw. Repository oder widersprüchlicher Zuordnung wird **fail-closed** abgebrochen. Es erfolgt kein automatischer Wiederholungs-Flash.
+- `StagedFlashes.json` führt erfolgreich geflashte oder sicher eingereihte, aber noch nicht aktive Firmware **pro Server und Paketdatei**. Dadurch überschreiben sich mehrere Komponenten desselben Typs nicht mehr und ein zweiter Lauf vor dem Reboot wiederholt sie nicht. Nach einem erkannten Server-Reboot wird ein weiterhin abweichender Eintrag entfernt, damit ein tatsächlich fehlgeschlagenes Update erneut versucht werden kann; unsichere `Submitting`-/`Submitted`-Marker bleiben davon getrennt.
+- Eindeutige Firmware-Downgrades werden unmittelbar im Flash-Worker gesperrt, auch wenn zuvor keine Inventarvorschau ausgeführt wurde.
 - Ist iLO-Firmware im Stapel, wird sie **zuletzt** geflasht; nach dem iLO-Reset wird die Session automatisch neu aufgebaut.
-- Server unterhalb Gen10 werden erkannt und übersprungen – **außer** die Option „Nur iLO (alle Gen.)" ist aktiv (dann wird nur die iLO-Firmware verarbeitet).
+- Server unterhalb Gen10 sowie Synergy Compute Modules werden bereits aus der Rackmount-Auswahl entfernt und zusätzlich vor dem Update live blockiert.
 
 ### Server-Quelle (OneView)
 
@@ -176,6 +210,31 @@ Firmware\                 ← Basisverzeichnis (im Tool auswählen)
 - Server ohne passenden Unterordner werden übersprungen (im Ergebnis als „Kein Typ-Ordner“ markiert).
 
 Voraussetzungen: **Windows Server 2022**, **PowerShell 7.5+**, iLO-Account mit Update-Berechtigung. iLO 5 (Gen10/Gen10 Plus), iLO 6 (Gen11) bzw. iLO 7 (Gen12).
+
+## Synergy Firmware Update (iLO Redfish)
+
+Das Tool [Oneview_FirmwareUpdateManager/OneView-SynergyFirmware-GUI.ps1](Oneview_FirmwareUpdateManager/OneView-SynergyFirmware-GUI.ps1) startet denselben geprüften Update-Kern in einem getrennten **Synergy-Modus**. OneView wird zur Ermittlung der Synergy Compute Modules, iLO-Adressen und Scopes verwendet; die Firmware wird anschließend direkt über die iLO-Redfish-API verarbeitet.
+
+- In der Serverauswahl erscheinen ausschließlich Modelle mit `Synergy` im von OneView gelieferten Modellnamen. Rackmount-Systeme werden zusätzlich anhand des live gelesenen Modells blockiert.
+- Der Synergy-Modus verwendet automatisch den gemeinsamen Paketordner:
+
+  ```
+  Firmware\
+  ├── gen10\
+  ├── gen11\
+  ├── gen12\
+  └── synergy\        ← alle Synergy-.fwpkg gemeinsam
+  ```
+
+- Alle Pakete unter `Firmware\synergy` werden einmal pro Vorgang indiziert. Die serverspezifische Auswahl erfolgt anschließend über Paket-JSON `Target`/`Targets`, `DeviceClass` und das Live-`FirmwareInventory`.
+- Der Flashweg wird ausschließlich aus `DirectFlashOk`, ersatzweise `UefiFlashable`, sowie `UpdatableBy` der Paket-JSON bestimmt.
+- **Strikter Versionsschutz:** Die Zielversion muss direkt aus der Paket-JSON stammen und eindeutig numerisch größer als jede zugeordnete installierte Version sein. Gleiche, ältere, fehlende oder nicht sicher vergleichbare Versionen werden nicht hochgeladen.
+- iLO-Firmware wird nach der serverspezifischen Paketwahl verbindlich zuletzt verarbeitet, da OneView nach dem iLO-Selbstreset die Verbindung bei Synergy längere Zeit blockieren kann.
+- Die Synergy-OneView-Instanzen werden getrennt in `Oneview_FirmwareUpdateManager/Synergy.txt` gepflegt (eine Adresse pro Zeile). Der Synergy-Starter übergibt diesen vollständigen Dateipfad explizit an den Update-Kern; Rackmount verwendet weiterhin `Oneview.txt`.
+- Die Serverauswahl zeigt die zugehörige OneView-Appliance in einer eigenen Spalte und kann danach gefiltert werden. Optional kann in `Synergy.txt` mit `Adresse;Anzeigename` ein verständlicher Appliance-Name hinterlegt werden; ohne Anzeigenamen wird die Adresse verwendet.
+- Aus den OneView-Serverdaten werden ausschließlich gültige IPv4-Adressen als iLO-Ziele übernommen. IPv6-Adressen und DNS-Namen werden verworfen.
+- Der separate Cache `SynergyServers.txt` verhindert eine Vermischung mit der Rackmount-Auswahl. Filter nach Modell, Scope und Servername sowie die einstellbare Parallelität bleiben für große Flotten erhalten.
+- Es erfolgt kein automatischer Serverneustart.
 
 ## Projektstruktur
 
@@ -209,9 +268,14 @@ OneView-VLAN-Manager/
 │   ├── Oneview_Alerts_GUI.ps1
 │   ├── Oneview_Alerts_Scheduled.ps1
 │   └── Oneview_Alerts_TaskConfig_GUI.ps1
-├── Oneview_FirmwareUpdateManager/         # Eigenständiges Tool: Rackmount Firmware Update (Gen10+, iLO Redfish)
+├── Oneview_FirmwareUpdateManager/         # Rackmount- und Synergy-Firmwareupdate über iLO Redfish
 │   ├── OneView-RackmountFirmware-GUI.ps1
-│   └── Servers.txt
+│   ├── OneView-SynergyFirmware-GUI.ps1
+│   ├── Oneview.txt
+│   ├── Synergy.txt
+│   ├── Servers.txt
+│   ├── SynergyServers.txt
+│   └── Reports/                         # Optional erzeugte HTML-Inventarberichte
 └── Synergy_eFuse/                     # Eigenständiges Tool: Synergy eFuse
     └── eFuse_GUI.ps1
 ```
